@@ -257,7 +257,7 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
   <aside class="side" id="side" aria-label="Question bank">
     <div class="brand">Imitate and Practice <small id="brandTag" style="font-weight:600;color:var(--muted)">· Reader</small></div>
     <div class="actions"><button class="btn fill" id="newBtn" type="button">New question</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button></div>
-    <div class="actions" id="adminRow" hidden><button class="btn" id="batchBtn" type="button">Make 3 variants for every question</button><button class="btn" id="syncBtn" type="button">Sync Reader site</button><button class="btn" id="viewBtn" type="button">Switch to Reader view</button></div>
+    <div class="actions" id="adminRow" hidden><button class="btn" id="batchBtn" type="button">Make 3 variants for every question</button><button class="btn" id="syncBtn" type="button" title="Saves bank.json. Then ask Claude Code to sync the Reader site.">Sync Reader site</button><button class="btn" id="viewBtn" type="button">Switch to Reader view</button></div>
     <div class="actions" id="backRow"><button class="btn fill" id="backStudio" type="button">← Back to Studio</button></div>
     <div class="actions" id="linkRow"><button class="btn" id="linkBtn" type="button">Reader public link</button></div>
     <section class="sgroup" role="search" aria-label="Filters">
@@ -365,7 +365,7 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
 </div></div>
 
 <div class="modal" id="qrModal" hidden><div class="sheet" style="width:min(420px,calc(100% - 32px));justify-items:center;text-align:center" role="dialog" aria-modal="true" aria-labelledby="qrHead"><h2 id="qrHead" style="margin:0;font-size:20px">Reader site: scan to open</h2><div id="qrBox" style="background:#fff;padding:12px;border-radius:12px;line-height:0"></div><a id="qrUrl" href="#" target="_blank" rel="noopener" style="word-break:break-all;font-size:14px"></a><span class="status" id="qrStatus"></span><div class="row"><button class="btn fill" id="qrCopy" type="button">Copy link</button><button class="ghost" id="qrClose" type="button">Close</button></div></div></div>
-<div class="modal" id="mvModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="mvHead"><h2 id="mvHead" style="margin:0;font-size:20px"></h2><p id="mvText" style="margin:0"></p><div class="row"><button class="btn danger fill" id="mvYes" type="button">Replace</button><button class="ghost" id="mvNo" type="button">Cancel</button></div></div></div>
+<div class="modal" id="mvModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="mvHead"><h2 id="mvHead" style="margin:0;font-size:20px"></h2><p id="mvText" style="margin:0;white-space:pre-line;line-height:1.55"></p><div class="row"><button class="btn fill" id="mvYes" type="button">OK</button></div></div></div>
 
 <script>
 window.MathJax = { tex: { inlineMath: [], displayMath: [] }, svg: { fontCache: "local" }, startup: { typeset: false } };
@@ -1460,7 +1460,15 @@ $("syncBtn").onclick = async () => {
     const questions = B.all.map((d) => ({ ...d }));
     const blob = new Blob([JSON.stringify({ app: "imitate-and-practice", savedAt: new Date().toISOString(), count: questions.length, questions })], { type: "application/json" });
     await dl.save({ filename: "bank.json", data: blob });
-    toast(`Saved bank.json (${questions.length} questions). Now run “Sync Reader.bat”, or tell Claude Code: sync the Reader site.`);
+    $("mvHead").textContent = "bank.json saved: the Reader site is NOT updated yet";
+    $("mvText").textContent = `The file holds all ${questions.length} questions. This page cannot publish to GitHub by itself.
+
+Next step, either:
+1. Tell Claude Code: “Sync the Reader site” (no file needed). Or
+2. Double-click “Sync Reader.bat” in C:\Claude\imitate-and-practice.
+
+Students see the new version one or two minutes after that.`;
+    $("mvYes").onclick = () => { $("mvModal").hidden = true; }; $("mvModal").hidden = false;
   } catch (e) { if (e && e.code === "declined") return; toast("Couldn't save bank.json. Try again."); }
 };
 
