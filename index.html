@@ -246,11 +246,11 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .question { flex: none; }
 .board { flex: 1 0 240px; min-height: 240px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; z-index: 30; max-width: calc(100% - 32px); }
-#backRow { display: none; }
-body.rv #backRow { display: flex; }
+#backRow, #linkRow { display: none; }
+body.rv #backRow, body.rv #linkRow { display: flex; }
 body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #bVar, body.rv #bExp { display: none !important; }
 [hidden] { display: none !important; }
-#newBtn, #tagBtn, #delBtn, #adminRow, #bVar, #bExp, #backRow { display: none !important; }
+#newBtn, #tagBtn, #delBtn, #adminRow, #bVar, #bExp, #backRow, #linkRow { display: none !important; }
 </style>
 
 <div id="app">
@@ -259,6 +259,7 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
     <div class="actions"><button class="btn fill" id="newBtn" type="button">New question</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button></div>
     <div class="actions" id="adminRow" hidden><button class="btn" id="batchBtn" type="button">Make 3 variants for every question</button><button class="btn" id="syncBtn" type="button">Sync Reader site</button><button class="btn" id="viewBtn" type="button">Switch to Reader view</button></div>
     <div class="actions" id="backRow"><button class="btn fill" id="backStudio" type="button">← Back to Studio</button></div>
+    <div class="actions" id="linkRow"><button class="btn" id="linkBtn" type="button">Reader public link</button></div>
     <section class="sgroup" role="search" aria-label="Filters">
       <label class="field"><span>SEARCH</span><input id="fSearch" type="search" placeholder="Number or text"></label>
       <div class="row" style="gap:8px; flex-wrap:nowrap">
@@ -363,6 +364,7 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
   <span class="status" id="tagStatus"></span>
 </div></div>
 
+<div class="modal" id="qrModal" hidden><div class="sheet" style="width:min(420px,calc(100% - 32px));justify-items:center;text-align:center" role="dialog" aria-modal="true" aria-labelledby="qrHead"><h2 id="qrHead" style="margin:0;font-size:20px">Reader site: scan to open</h2><div id="qrBox" style="background:#fff;padding:12px;border-radius:12px;line-height:0"></div><a id="qrUrl" href="#" target="_blank" rel="noopener" style="word-break:break-all;font-size:14px"></a><span class="status" id="qrStatus"></span><div class="row"><button class="btn fill" id="qrCopy" type="button">Copy link</button><button class="ghost" id="qrClose" type="button">Close</button></div></div></div>
 <div class="modal" id="mvModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="mvHead"><h2 id="mvHead" style="margin:0;font-size:20px"></h2><p id="mvText" style="margin:0"></p><div class="row"><button class="btn danger fill" id="mvYes" type="button">Replace</button><button class="ghost" id="mvNo" type="button">Cancel</button></div></div></div>
 
 <script>
@@ -1430,6 +1432,26 @@ $("batchBtn").onclick = async () => {
 var rv = false, rvWrite = false;
 $("viewBtn").onclick = () => { rv = true; rvWrite = canWrite; canWrite = false; document.body.classList.add("rv"); S.answer = false; applyFilters((S.orig && S.orig.id) || null); toast("Reader view. Press “Back to Studio” to edit again."); };
 $("backStudio").onclick = () => { rv = false; canWrite = rvWrite; document.body.classList.remove("rv"); applyFilters((S.orig && S.orig.id) || null); };
+// public link of the Reader site: copy it and show a QR code students can scan
+const READER_URL = "https://tygermath.github.io/imitate-and-practice-reader/";
+let qrLib = null;
+function loadQr() {
+  if (window.qrcode) return Promise.resolve(window.qrcode);
+  return qrLib || (qrLib = new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"; sc.onload = () => ok(window.qrcode); sc.onerror = () => { qrLib = null; no(); }; document.head.append(sc); }));
+}
+async function copyLink() {
+  try { await navigator.clipboard.writeText(READER_URL); return true; } catch (e) {}
+  try { const t = document.createElement("textarea"); t.value = READER_URL; t.style.position = "fixed"; t.style.opacity = "0"; document.body.append(t); t.select(); const ok = document.execCommand("copy"); t.remove(); return ok; } catch (e) { return false; }
+}
+$("linkBtn").onclick = async () => {
+  $("qrUrl").href = READER_URL; $("qrUrl").textContent = READER_URL; $("qrBox").textContent = ""; $("qrModal").hidden = false;
+  $("qrStatus").className = "status"; $("qrStatus").textContent = (await copyLink()) ? "✓ Link copied" : "Couldn't copy automatically. Press Copy link.";
+  try { const q = (await loadQr())(0, "M"); q.addData(READER_URL); q.make(); $("qrBox").innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); const sv = $("qrBox").querySelector("svg"); if (sv) { sv.setAttribute("width", "260"); sv.setAttribute("height", "260"); sv.setAttribute("role", "img"); sv.setAttribute("aria-label", "QR code for the Reader site"); } }
+  catch (e) { $("qrBox").textContent = "The QR code could not be made. Use the link below."; }
+};
+$("qrCopy").onclick = async () => { $("qrStatus").className = "status"; $("qrStatus").textContent = (await copyLink()) ? "✓ Link copied" : "Couldn't copy. Select the link and copy it."; };
+$("qrClose").onclick = () => { $("qrModal").hidden = true; };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("qrModal").hidden = true; });
 $("syncBtn").onclick = async () => {
   if (!db) return;
   try {
