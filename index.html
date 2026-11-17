@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>window.READER = true;
+// downloads in a normal browser: save the Word file through a link
+window.claude = { use: async (n) => n === 'downloads' ? { save: async ({ filename, data }) => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(data); a.download = filename;
+  document.body.append(a); a.click(); a.remove(); } } : null };</script>
+<title>Imitate and Practice Reader</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+/* Layout: a projector stage — question pinned at the top, an open dotted board in the middle, a teaching dock at the bottom. */
+:root {
+  --paper: #fbfcfd;
+  --board: #f4f6f8;
+  --dot: #d5dbe2;
+  --ink: #17212b;
+  --muted: #5a6876;
+  --line: #d9e0e7;
+  --chalk: #1f5f8b;        /* main accent: blackboard-blue marker */
+  --chalk-ink: #ffffff;
+  --variant: #b5551b;      /* variant mode: orange marker */
+  --variant-soft: #fbe9dc;
+  --orig-soft: #e1eef7;
+  --card: #ffffff;
+  --shadow: 0 10px 30px rgba(23, 33, 43, .12);
+  --danger: #b3261e;
+  --font-q: "Source Serif 4", "Noto Serif TC", "Times New Roman", serif;
+  --font-ui: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12181e; --board: #161e25; --dot: #26313b; --ink: #e8edf2; --muted: #9aa8b5; --line: #2a3640;
+    --chalk: #6fb3e0; --chalk-ink: #0d1419; --variant: #f0a066; --variant-soft: #3a2618; --orig-soft: #17303f;
+    --card: #1b242c; --shadow: 0 10px 30px rgba(0, 0, 0, .45); --danger: #ff8a80; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12181e; --board: #161e25; --dot: #26313b; --ink: #e8edf2; --muted: #9aa8b5; --line: #2a3640;
+  --chalk: #6fb3e0; --chalk-ink: #0d1419; --variant: #f0a066; --variant-soft: #3a2618; --orig-soft: #17303f;
+  --card: #1b242c; --shadow: 0 10px 30px rgba(0, 0, 0, .45); --danger: #ff8a80; color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 15px; }
+#app { height: 100%; display: flex; flex-direction: column; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, textarea:focus-visible, label.drop:focus-within { outline: 3px solid var(--chalk); outline-offset: 2px; }
+
+/* top bar */
+.top { display: flex; align-items: center; gap: 12px; padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; letter-spacing: .04em; }
+.mode { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--orig-soft); color: var(--chalk); }
+.mode.variant { background: var(--variant-soft); color: var(--variant); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.tab { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 5px 14px; font-weight: 700; font-size: 14px; }
+.tab:hover { border-color: var(--chalk); color: var(--chalk); }
+.tab.cur { background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); }
+.tab.v { color: var(--variant); border-color: var(--variant); }
+.tab.v.cur { background: var(--variant); color: var(--chalk-ink); }
+.dock { gap: 12px; }
+.dock .btn { min-width: 140px; }
+.spacer { flex: 1; }
+.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); padding: 6px 12px; border-radius: 8px; }
+.ghost:hover { border-color: var(--chalk); color: var(--chalk); }
+
+/* teaching stage */
+#teachView { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.question { padding-block: 18px 14px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px dashed var(--line); display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.partbar { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; margin-bottom: -6px; font-variant-numeric: tabular-nums; }
+.partbar b { min-width: 3.4em; text-align: center; }
+.partbar .ghost { padding: 3px 12px; }
+.qtext { flex: 1 1 520px; min-width: 0; font-family: var(--font-q); font-size: clamp(18px, 2.1vw, 30px); line-height: 1.55; }
+.qtext p { margin: 0 0 .35em; text-wrap: pretty; }
+.qtext p.part { padding-left: 2.2em; text-indent: -2.2em; }
+.qtext p.sub { padding-left: 4.2em; text-indent: -2em; }
+.qtext .lbl { font-weight: 600; }
+.qfig { flex: 0 1 380px; max-width: 100%; background: #fff; border-radius: 10px; padding: 10px; border: 1px solid var(--line); }
+.qfig img { display: block; width: 100%; height: auto; }
+mjx-container { color: inherit; }
+/* MathJax also writes a hidden MathML copy for screen readers; it must never show as text (it made "t" appear as "tt") */
+mjx-assistive-mml { position: absolute !important; clip: rect(1px, 1px, 1px, 1px) !important; width: 1px !important; height: 1px !important; overflow: hidden !important; padding: 0 !important; border: 0 !important; margin: -1px !important; user-select: none !important; }
+.review { border: 2px solid var(--variant); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; background: var(--variant-soft); }
+.review h3 { margin: 0; font-size: 15px; }
+.review .ans { font-family: var(--font-q); font-size: 17px; background: var(--paper); border-radius: 8px; padding: 8px 10px; border: 0; }
+.review .ans p { margin: 0 0 .25em; }
+.board { flex: 1; min-height: 120px; background-color: var(--board);
+  background-image: radial-gradient(var(--dot) 1.2px, transparent 1.3px); background-size: 28px 28px; }
+
+/* answer card */
+.answer { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 14px; width: min(560px, calc(100% - 32px));
+  max-height: 62%; overflow: auto; background: var(--card); border-radius: 14px; box-shadow: var(--shadow); border-top: 6px solid var(--chalk); padding: 14px 18px 16px; }
+.answer.variant { border-top-color: var(--variant); }
+.board { position: relative; }
+/* with the solution open, the card takes the whole blank area under the question */
+.answer.expanded { inset: 0; width: auto; max-height: none; border-radius: 0; box-shadow: none; box-sizing: border-box;
+  padding: 16px max(24px, env(safe-area-inset-right, 0px)) 18px max(24px, env(safe-area-inset-left, 0px)); }
+.answer.expanded .ans { font-size: clamp(20px, 2.1vw, 30px); }
+.answer.expanded .sol { font-size: clamp(18px, 1.9vw, 27px); line-height: 1.6; }
+.afigs { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 4px; }
+.afigs figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; max-width: min(100%, 640px); }
+.afigs img { display: block; width: 100%; height: auto; }
+.sol .grp { margin: 0 0 .5em; }
+.sol .grp > .gl { font-weight: 700; margin: 0; }
+.sol ul { margin: .1em 0 .3em; padding-left: 1.5em; }
+.sol li { margin: .18em 0; }
+.sol li::marker { color: var(--chalk); }
+.answer.variant .sol li::marker { color: var(--variant); }
+.answer h3 { margin: 0; font-size: 14px; letter-spacing: .08em; color: var(--muted); }
+.answer .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.answer .ans { font-family: var(--font-q); font-size: clamp(18px, 1.8vw, 26px); line-height: 1.5; }
+.answer .ans p, .answer .sol p { margin: 0 0 .3em; }
+.answer .sol { font-family: var(--font-q); font-size: clamp(16px, 1.4vw, 21px); line-height: 1.55; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.link { background: none; border: 0; color: var(--chalk); padding: 2px 4px; font-weight: 700; }
+.answer.variant .link { color: var(--variant); }
+
+/* dock */
+.dock { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: center; border-top: 1px solid var(--line); background: var(--paper);
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.group .tag { font-size: 12px; color: var(--muted); letter-spacing: .1em; margin-right: 2px; }
+.btn { border: 2px solid var(--chalk); background: var(--card); color: var(--chalk); border-radius: 10px; padding: 9px 16px; font-weight: 700; font-size: 16px; }
+.btn.fill { background: var(--chalk); color: var(--chalk-ink); }
+.btn.v { border-color: var(--variant); color: var(--variant); }
+.btn.v.fill { background: var(--variant); color: var(--chalk-ink); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn:not(:disabled):hover { transform: translateY(-1px); }
+
+/* filter row (question bank) */
+#app { flex-direction: row; }
+.main { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
+.side { flex: 0 0 300px; width: 300px; height: 100%; box-sizing: border-box; overflow-y: auto; background: var(--card); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 18px; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px; }
+.side.closed { display: none; }
+.side .brand { font-size: 19px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.actions .btn { padding: 7px 14px; font-size: 14px; }
+.actions .btn.fill { grid-column: 1 / -1; }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.sgroup { display: grid; gap: 10px; }
+.sgroup h2 { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.sgroup .field { flex: none; }
+dl.tagdl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
+dl.tagdl dt { color: var(--muted); font-size: 12px; letter-spacing: .06em; padding-top: 1px; }
+dl.tagdl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.qlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.qlist button { width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 7px 9px; color: var(--ink); display: grid; gap: 2px; }
+.qlist button:hover { border-color: var(--line); }
+.qlist button.cur { background: var(--orig-soft); border-color: var(--chalk); }
+.qlist .qn { font-weight: 700; font-size: 13px; }
+.qlist .qs { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* textbook tree */
+.tree { display: grid; gap: 1px; font-size: 14px; }
+.tree details details { margin-left: 14px; }
+.tree summary, .tree .node { list-style: none; cursor: pointer; display: flex; gap: 6px; align-items: baseline; padding: 5px 6px; border-radius: 6px; border: 0; background: none; color: var(--ink); width: 100%; text-align: left; font: inherit; box-sizing: border-box; }
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before { content: "▸"; color: var(--muted); flex: none; width: 1em; transition: transform .15s; }
+.tree details[open] > summary::before { transform: rotate(90deg); }
+.tree summary:hover, .tree .node:hover { background: var(--board); }
+.tree summary:focus-visible, .tree .node:focus-visible { outline: 2px solid var(--chalk); outline-offset: 1px; }
+.tree .t { flex: 1; min-width: 0; }
+.tree .cnt { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.tree .sel { background: var(--orig-soft); color: var(--chalk); font-weight: 700; }
+.tree .dim .t { color: var(--muted); }
+.tree .leaves { display: grid; gap: 1px; margin: 2px 0 6px 30px; }
+.tree .leaf { display: grid; gap: 1px; text-align: left; border: 1px solid transparent; background: none; border-radius: 6px; padding: 5px 8px; color: var(--ink); font: inherit; cursor: pointer; }
+.tree .leaf:hover { border-color: var(--line); }
+.tree .drop { outline: 2px dashed var(--chalk); outline-offset: -2px; background: var(--orig-soft); }
+.tree .leaf[draggable=true] { cursor: grab; }
+.tree .leaf.cur { background: var(--orig-soft); border-color: var(--chalk); }
+.tree .leaf b { font-size: 13px; }
+.tree .leaf b small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.tree .leaf span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .tree summary::before { transition: none; } }
+/* edit dialog */
+.sheet.wide { width: min(1100px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; }
+.editCols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 860px) { .editCols { grid-template-columns: 1fr; } }
+.editFields { display: grid; gap: 10px; align-content: start; }
+.field textarea { min-height: 0; font-size: 16px; padding: 8px 10px; border-radius: 8px; }
+.preview { border: 1px dashed var(--line); border-radius: 10px; padding: 12px 14px; background: var(--paper); min-width: 0; overflow: auto; display: grid; gap: 10px; align-content: start; }
+.preview .qtext { font-size: 20px; }
+.preview .ans { font-family: var(--font-q); font-size: 18px; border-top: 1px solid var(--line); padding-top: 8px; }
+.preview .ans p { margin: 0 0 .25em; }
+.plabel { font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.check { display: flex; gap: 8px; align-items: center; }
+@media (max-width: 900px) {
+  .side { position: fixed; inset: 0 auto 0 0; width: min(320px, 88vw); z-index: 22; box-shadow: var(--shadow); padding-top: max(16px, env(safe-area-inset-top, 0px)); }
+}
+.field { display: grid; gap: 4px; flex: 1 1 120px; min-width: 0; }
+.field.wide { flex: 2 1 220px; }
+.field > span { font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.field select, .field input { height: 38px; box-sizing: border-box; width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); padding: 0 10px; font: inherit; }
+.field select:disabled { opacity: .5; }
+.field select:focus-visible, .field input:focus-visible { outline: 3px solid var(--chalk); outline-offset: 1px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.nav { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); }
+.tagGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+fieldset.tags { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; margin: 0; }
+fieldset.tags legend { padding: 0 6px; font-weight: 700; }
+.modal { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 70%, transparent); z-index: 25; }
+.sheet { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; width: min(780px, calc(100% - 32px)); display: grid; gap: 14px; }
+.sheet h2 { margin: 0; font-size: 18px; }
+.danger { border-color: var(--danger); color: var(--danger); }
+.empty { color: var(--muted); font-family: var(--font-ui); font-size: 18px; }
+
+/* input view */
+#inputView { flex: 1; min-height: 0; overflow: auto; padding-block: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.inwrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 16px; }
+.inwrap h1 { margin: 0; font-family: "Noto Serif TC", serif; font-size: 26px; text-wrap: balance; }
+.inwrap .hint { margin: 0; color: var(--muted); line-height: 1.6; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+.cols > * { min-width: 0; }
+textarea { width: 100%; box-sizing: border-box; min-height: 240px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--card); color: var(--ink);
+  font-family: var(--font-q); font-size: 17px; line-height: 1.5; }
+label.drop { display: grid; place-items: center; text-align: center; gap: 6px; min-height: 240px; border: 2px dashed var(--line); border-radius: 12px; background: var(--card); color: var(--muted); padding: 12px; cursor: pointer; }
+label.drop.over { border-color: var(--chalk); color: var(--chalk); }
+label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.thumbs figure { margin: 0; position: relative; }
+.thumbs img { height: 110px; border-radius: 8px; border: 1px solid var(--line); }
+.thumbs button { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.status { color: var(--muted); }
+.status.err { color: var(--danger); }
+
+/* busy overlay */
+.busy { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 78%, transparent); z-index: 20; }
+.busy .box { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 22px 26px; display: grid; gap: 12px; justify-items: center; min-width: 260px; max-width: calc(100% - 32px); }
+.spin { width: 34px; height: 34px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--chalk); animation: s 1s linear infinite; }
+@keyframes s { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .btn:not(:disabled):hover { transform: none; } }
+/* Layout guard: the question area scrolls inside the window, so the buttons stay on screen whatever the window size or question length */
+.main { overflow: hidden; }
+.top, .dock { flex: none; }
+#teachView { overflow-y: auto; overflow-x: hidden; }
+.question { flex: none; }
+.board { flex: 1 0 240px; min-height: 240px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; z-index: 30; max-width: calc(100% - 32px); }
+[hidden] { display: none !important; }
+#newBtn, #tagBtn, #delBtn, #adminRow, #bVar { display: none !important; }
+</style>
+
+<div id="app">
+  <aside class="side" id="side" aria-label="Question bank">
+    <div class="brand">Imitate and Practice <small id="brandTag" style="font-weight:600;color:var(--muted)">· Reader</small></div>
+    <div class="actions"><button class="btn fill" id="newBtn" type="button">New question</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button></div>
+    <div class="actions" id="adminRow" hidden><button class="btn" id="batchBtn" type="button">Make 3 variants for every question</button><button class="btn" id="syncBtn" type="button">Sync Reader site</button></div>
+    <section class="sgroup" role="search" aria-label="Filters">
+      <label class="field"><span>SEARCH</span><input id="fSearch" type="search" placeholder="Number or text"></label>
+      <div class="row" style="gap:8px; flex-wrap:nowrap">
+        <label class="field"><span>TYPE</span><select id="fType"></select></label>
+        <label class="field"><span>CATEGORY</span><select id="fCat"></select></label>
+      </div>
+    </section>
+    <section class="sgroup" aria-labelledby="treeHead">
+      <h2 id="treeHead">New Discovering Mathematics</h2>
+      <nav class="tree" id="tree" aria-labelledby="treeHead"></nav>
+    </section>
+  </aside>
+  <div class="main">
+  <header class="top" id="topRow">
+    <button class="ghost" id="sideBtn" type="button" aria-controls="side" aria-expanded="true">☰ Contents</button>
+    <nav class="tabs" id="vTabs" aria-label="Original and variants"></nav>
+    <span class="spacer"></span>
+    <span class="nav"><button class="ghost" id="prevQ" type="button" aria-label="Previous question">◀</button><span id="posQ">–</span><button class="ghost" id="nextQ" type="button" aria-label="Next question">▶</button></span>
+  </header>
+
+  <section id="inputView" hidden>
+    <div class="inwrap">
+      <h1>Enter a question</h1>
+      <p class="hint">Type or paste the question, or upload a photo or screenshot of it (drag the image here, or press Ctrl+V on this page). Claude retypes the question, redraws any diagram, and writes the answer and a worked solution.</p>
+      <div class="cols">
+        <textarea id="qInput" placeholder="e.g. A cylinder has a base radius of 2 cm and a height of 3 cm. Find its volume in terms of π."></textarea>
+        <label class="drop" id="drop">
+          <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+          <span id="dropText">Click to choose an image, or drag one here</span>
+          <div class="thumbs" id="thumbs"></div>
+        </label>
+      </div>
+      <fieldset class="tags"><legend>Tags for the question bank</legend><div class="tagGrid" id="inTagGrid"></div></fieldset>
+      <div class="row">
+        <button class="btn fill" id="goBtn" type="button">Prepare question</button>
+        <button class="ghost" id="backBtn" type="button">Back to current question</button>
+        <span class="status" id="inStatus"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="teachView">
+    <div class="question">
+      <div class="partbar" id="partBar" hidden>
+        <span class="plabel">PART</span>
+        <button class="ghost" id="partPrev" type="button" aria-label="Previous part">◀</button>
+        <b id="partPos">1 / 1</b>
+        <button class="ghost" id="partNext" type="button" aria-label="Next part">▶</button>
+        <button class="ghost" id="partToggle" type="button">Show all parts</button>
+      </div>
+      <div class="qtext" id="qText"></div>
+      <div class="qfig" id="qFig" hidden><img id="qFigImg" alt="Question diagram"></div>
+    </div>
+    <div class="board" aria-label="Blank space for explaining">
+      <div class="answer" id="ansCard" hidden>
+        <div class="head"><h3 id="ansTitle">ORIGINAL · ANSWER</h3><span class="spacer"></span>
+          <button class="link" id="figBtn" type="button" hidden>Draw figure</button>
+          <button class="link" id="solBtn" type="button">Show solution</button>
+          <button class="link" id="ansClose" type="button" aria-label="Close answer">Close</button></div>
+        <div class="ans" id="ansBody"></div>
+        <div class="afigs" id="ansFigs"></div>
+        <div class="sol" id="solBody" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <nav class="dock" id="dock" aria-label="Teaching tools">
+    <button class="btn" id="bAns" type="button">Answer</button>
+    <button class="btn" id="bExp" type="button">Export</button>
+    <button class="btn v fill" id="bVar" type="button">Variant</button>
+  </nav>
+  </div>
+</div>
+
+<div class="busy" id="busy" hidden><div class="box"><div class="spin" aria-hidden="true"></div><div id="busyText">Working…</div><button class="ghost" id="stopBtn" type="button">Stop</button></div></div>
+<div class="toast" id="toast" hidden role="status"></div>
+<div class="modal" id="tagModal" hidden><div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="tagHead">
+  <h2 id="tagHead">Edit question</h2>
+  <div class="tagGrid" id="edTagGrid"></div>
+  <div class="editCols">
+    <div class="editFields">
+      <label class="field"><span>QUESTION · ONE PARAGRAPH OR PART PER LINE</span><textarea id="edQ" rows="7"></textarea></label>
+      <label class="field"><span>ANSWER · ONE PART PER LINE</span><textarea id="edA" rows="3"></textarea></label>
+      <label class="field"><span>SOLUTION · ONE STEP PER LINE</span><textarea id="edS" rows="6"></textarea></label>
+      <label class="check" id="edFigWrap"><input type="checkbox" id="edFig" checked> Keep the diagram</label>
+      <button class="ghost" id="edRedraw" type="button">Redraw the diagram (graphs on grid paper)</button>
+      <label class="check"><input type="checkbox" id="edCheck" checked> After saving, check that the answer and solution still match</label>
+      <p class="note" style="margin:0">Start a part with its label, e.g. (a) or (i). Write maths between dollar signs, e.g. $\frac{3}{4}x^2$; type a money sign as \$.</p>
+    </div>
+    <div class="preview" aria-live="polite"><span class="plabel">PREVIEW</span><div class="qtext" id="edPrevQ"></div><div class="afigs" id="edFigPrev"></div><div class="ans" id="edPrevA"></div></div>
+  </div>
+  <div class="review" id="edReview" hidden>
+    <h3 id="edRevHead"></h3>
+    <div class="editCols">
+      <div class="editFields"><span class="plabel">CURRENT ANSWER AND SOLUTION</span><div class="ans" id="edRevOld"></div></div>
+      <div class="editFields"><span class="plabel">SUGGESTED FOR THE EDITED QUESTION</span><div class="ans" id="edRevNew"></div></div>
+    </div>
+    <div class="row"><button class="btn v fill" id="revUse" type="button">Use the suggested answer and solution</button><button class="ghost" id="revKeep" type="button">Keep the current ones</button><button class="ghost" id="revBack" type="button">Back to editing</button></div>
+  </div>
+  <div class="row"><button class="btn fill" id="tagSave" type="button">Save changes</button><button class="ghost" id="tagCancel" type="button">Cancel</button>
+    <span class="spacer"></span><button class="ghost danger" id="tagDel" type="button">Delete question</button></div>
+  <span class="status" id="tagStatus"></span>
+</div></div>
+
+<div class="modal" id="mvModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="mvHead"><h2 id="mvHead" style="margin:0;font-size:20px"></h2><p id="mvText" style="margin:0"></p><div class="row"><button class="btn danger fill" id="mvYes" type="button">Replace</button><button class="ghost" id="mvNo" type="button">Cancel</button></div></div></div>
+
+<script>
+window.MathJax = { tex: { inlineMath: [], displayMath: [] }, svg: { fontCache: "local" }, startup: { typeset: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+/* ---------------- example problem (shown until the teacher enters one) ---------------- */
+const EXAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 300" width="420" height="300">
+<rect width="420" height="300" fill="#ffffff"/>
+<g fill="none" stroke="#111111" stroke-width="2" stroke-linejoin="round">
+<polygon points="60,130 60,250 220,250" fill="#e6edf3"/>
+<polygon points="60,130 210,50 370,170 220,250" fill="#f3f6f9"/>
+<line x1="60" y1="130" x2="220" y2="250"/>
+<g stroke-dasharray="6 5"><line x1="60" y1="250" x2="210" y2="170"/><line x1="210" y1="170" x2="210" y2="50"/><line x1="210" y1="170" x2="370" y2="170"/></g>
+<polyline points="60,236 74,236 74,250"/>
+</g>
+<g font-family="Times New Roman, serif" font-size="21" fill="#111111">
+<text x="38" y="130" font-style="italic">A</text><text x="38" y="270" font-style="italic">B</text><text x="222" y="274" font-style="italic">C</text>
+<text x="200" y="40" font-style="italic">D</text><text x="216" y="190" font-style="italic">E</text><text x="378" y="176" font-style="italic">F</text>
+<text x="40" y="198">6</text><text x="134" y="274">8</text><text x="300" y="232">15</text>
+</g></svg>`;
+const EXAMPLE = {
+  question: ["The diagram shows a triangular prism in which $AB = 6$ cm, $BC = 8$ cm, $\\angle ABC = 90^\\circ$ and $CF = 15$ cm.",
+             "(a) Find the volume of the prism.", "(b) Find the total surface area of the prism."],
+  figure_svg: EXAMPLE_SVG,
+  answer: ["(a) 360 cm³", "(b) 408 cm²"],
+  solution: ["Area of $\\triangle ABC = \\frac{1}{2}\\times 6\\times 8 = 24$ cm²",
+             "(a) Volume $= 24\\times 15 = 360$ cm³",
+             "$AC = \\sqrt{6^2+8^2} = 10$ cm",
+             "(b) Total surface area $= 2\\times 24 + (6+8+10)\\times 15 = 48 + 360 = 408$ cm²"],
+  example: true
+};
+
+/* ---------------- state ---------------- */
+const S = { orig: EXAMPLE, variants: [], showing: "orig", answerFor: null, images: [] };
+// question bank: B.all = every stored question, B.list = those matching the filter row
+const B = { all: [], list: [], idx: -1, loaded: false, lastId: null, f: { book: "", root: "", topic: "", vol: "", chap: "", sec: "", type: "", cat: "", q: "" } };
+function save() { try { localStorage.setItem("tb_prefs", JSON.stringify({ f: B.f, lastId: S.orig && S.orig.id || B.lastId })); } catch (e) {} }
+function load() { try { const d = JSON.parse(localStorage.getItem("tb_prefs") || "null"); if (d && d.f) { B.f = { ...B.f, ...d.f }; B.lastId = d.lastId || null; } } catch (e) {} }
+// S.vi: which one is on screen, -1 = the original, 0..2 = Variant 1..3. S.answer: the answer card is open.
+S.vi = -1; S.answer = false;
+S.part = 0;      // which part is on screen when a long question is split
+S.split = null;  // null = decide by length, true/false = the teacher's choice
+const MAXV = 3;
+const cur = () => S.vi < 0 ? S.orig : S.variants[S.vi];
+
+/* ---------------- textbook contents (New Discovering Mathematics) ---------------- */
+// volumes, chapters and sections as listed in the STAR Publishing NDM e-books (Books 1-4)
+const TOC = {"1":[{"n":1,"title":"Factors and Multiples","sections":[["1.1","Primes, Prime Factorisation and Index Notation"],["1.2","Highest Common Factor (HCF)"],["1.3","Lowest Common Multiple (LCM)"],["1.4","Square Roots and Cube Roots"]]},{"n":2,"title":"Real Numbers","sections":[["2.1","Concept of Negative Numbers and the Number Line"],["2.2","Addition and Subtraction of Integers"],["2.3","Multiplication, Division and Combined Operations of Integers"],["2.4","Rational Numbers, Irrational Numbers and Real Numbers"],["2.5","Operations on Real Numbers"]]},{"n":3,"title":"Approximation and Estimation","sections":[["3.1","Rounding Off Numbers to Specified Decimal Places"],["3.2","Rounding Off Numbers to Specified Significant Figures"],["3.3","Estimation"]]},{"n":4,"title":"Basic Algebra and Algebraic Manipulations","sections":[["4.1","Introduction to Algebra"],["4.2","Simplification of Linear Expressions"],["4.3","Expansion of Linear Expressions"],["4.4","Factorisation of Algebraic Expressions"]]},{"n":5,"title":"Simple Equations in One Variable","sections":[["5.1","Simple Linear Equations in One Variable"],["5.2","Linear Equations Involving Brackets and Fractions"],["5.3","Simple Fractional Equations"],["5.4","Formulate Linear Equations to Solve Word Problems"]]},{"n":6,"title":"Angles and Parallel Lines","sections":[["6.1","Points, Lines and Planes"],["6.2","Angles"],["6.3","Parallel Lines and Transversals"]]},{"n":7,"title":"Triangles, Quadrilaterals and Other Polygons","sections":[["7.1","Triangles"],["7.2","Quadrilaterals"],["7.3","Polygons"],["7.4","Construction of Triangles and Quadrilaterals"]]},{"n":8,"title":"Ratio, Rate and Speed","sections":[["8.1","Ratio"],["8.2","Rate"],["8.3","Speed"]]},{"n":9,"title":"Percentage","sections":[["9.1","Introduction to Percentage"],["9.2","Percentage Change"],["9.3","Reverse Percentage"],["9.4","Problems Involving Percentages in Practical Situations"]]},{"n":10,"title":"Sequences and Number Patterns","sections":[["10.1","Sequences"],["10.2","Number Patterns Involving Geometric Figures"]]},{"n":11,"title":"Linear Functions and Graphs","sections":[["11.1","Cartesian Coordinates"],["11.2","Concept of a Function"],["11.3","Linear Functions and Linear Graphs"],["11.4","Gradient of Linear Graphs"]]},{"n":12,"title":"Perimeter and Area of Plane Figures","sections":[["12.1","Perimeter and Area of Parallelograms"],["12.2","Perimeter and Area of Trapeziums"],["12.3","Perimeter and Area of Composite Plane Figures"]]},{"n":13,"title":"Volume and Surface Area of Prisms and Cylinders","sections":[["13.1","Views and Nets of 3D Objects"],["13.2","Volume and Total Surface Area of Prisms"],["13.3","Volume and Total Surface Area of Cylinders"],["13.4","Volume and Surface Area of Composite Solids"]]},{"n":14,"title":"Data Handling","sections":[["14.1","Collecting Data"],["14.2","Organising Data"],["14.3","Representing and Analysing Data"],["14.4","Statistics in Real Life"]]}],"2":[{"n":1,"title":"Linear Inequalities","sections":[["1.1","Simple Linear Inequalities"],["1.2","Linear Inequalities in One Variable"]]},{"n":2,"title":"Linear Equations in Two Variables","sections":[["2.1","Graphs of Linear Equations in Two Variables (ax + by = c)"],["2.2","Solving Simultaneous Linear Equations by the Graphical Method"],["2.3","Solving Simultaneous Linear Equations by Algebraic Methods"],["2.4","Applications of Simultaneous Equations"]]},{"n":3,"title":"Expansion and Factorisation of Algebraic Expressions","sections":[["3.1","Quadratic Expressions"],["3.2","Expansion of the Product of Algebraic Expressions"],["3.3","Expansion Using Special Products of Algebraic Expressions"],["3.4","Factorisation of ax² + bx + c"],["3.5","Factorisation Using Special Products of Algebraic Expressions"],["3.6","Factorisation by Grouping Terms"]]},{"n":4,"title":"Algebraic Fractions and Formulae","sections":[["4.1","Simplifying Algebraic Fractions"],["4.2","Multiplication and Division of Algebraic Fractions"],["4.3","Addition and Subtraction of Algebraic Fractions"],["4.4","Algebraic Formulae"]]},{"n":5,"title":"Quadratic Functions, Graphs and Equations","sections":[["5.1","Graphs of Quadratic Functions"],["5.2","Solving Quadratic Equations by Factorisation"],["5.3","Applications of Quadratic Equations in Real-world Contexts"]]},{"n":6,"title":"Proportion","sections":[["6.1","Direct Proportion"],["6.2","Inverse Proportion"]]},{"n":7,"title":"Congruence and Similarity","sections":[["7.1","Congruence"],["7.2","Similarity"],["7.3","Applications of Similarity"]]},{"n":8,"title":"Pythagoras' Theorem","sections":[["8.1","Pythagoras' Theorem and Its Converse"],["8.2","Applications of Pythagoras' Theorem"]]},{"n":9,"title":"Trigonometric Ratios","sections":[["9.1","Trigonometric Ratios of Acute Angles"],["9.2","Applications of Trigonometric Ratios in Real-world Contexts"]]},{"n":10,"title":"Volume and Surface Area of Pyramids, Cones and Spheres","sections":[["10.1","Pyramids"],["10.2","Cones"],["10.3","Spheres"]]},{"n":11,"title":"Statistical Diagrams","sections":[["11.1","Dot Diagrams"],["11.2","Histograms"],["11.3","Stem-and-leaf Diagrams"]]},{"n":12,"title":"Measures of Central Tendency","sections":[["12.1","Mean"],["12.2","Median"],["12.3","Mode"]]},{"n":13,"title":"Probability","sections":[["13.1","Introduction to Probability"],["13.2","More Problems Involving Probability"]]}],"3":[{"n":1,"title":"More About Quadratic Equations and Quadratic Functions","sections":[["1.1","Solving Quadratic Equations by Completing the Square"],["1.2","Solving Quadratic Equations by Using Quadratic Formula"],["1.3","Solving Quadratic Equations by Using Graphical Method"],["1.4","Solving Fractional Equations that can be Reduced to Quadratic Equations"],["1.5","Solving Real-world Problems Involving Quadratic Equations"],["1.6","Sketching the Graphs of Quadratic Functions"]]},{"n":2,"title":"More About Linear Inequalities","sections":[["2.1","Notations and Basic Properties of Inequalities"],["2.2","Simultaneous Linear Inequalities"],["2.3","Applications of Simultaneous Linear Inequalities"]]},{"n":3,"title":"Indices","sections":[["3.1","Positive Integer Indices and Laws of Indices"],["3.2","Zero and Negative Integer Indices"],["3.3","Fractional Indices"],["3.4","Solving Equations Involving Indices"],["3.5","Standard Form"],["3.6","Application of Indices to Compound Interest"]]},{"n":4,"title":"Coordinate Geometry","sections":[["4.1","Gradient of a Straight Line"],["4.2","Equation of a Straight Line"],["4.3","Length of a Line Segment"],["4.4","Geometric Problems Involving the Use of Coordinates"]]},{"n":5,"title":"Functions and Graphs","sections":[["5.1","Graphs of Power Functions"],["5.2","Graphs of Exponential Functions"],["5.3","Gradients of Curves"],["5.4","Graphs of Simple Sums of Power Functions"],["5.5","Graphs in Practical Situations"]]},{"n":6,"title":"Conditions of Congruence and Similarity","sections":[["6.1","Congruence Tests"],["6.2","Similarity Tests"],["6.3","Ratio of Areas of Similar Plane Figures"],["6.4","Ratio of Volumes of Similar Solids"],["6.5","Perpendicular Bisectors, Angle Bisectors and Scale Drawings"]]},{"n":7,"title":"Further Trigonometry","sections":[["7.1","Sine and Cosine of Obtuse Angles"],["7.2","Formula for the Area of a Triangle"],["7.3","The Sine Rule"],["7.4","The Cosine Rule"]]},{"n":8,"title":"Applications of Trigonometry","sections":[["8.1","Bearing Problems"],["8.2","Angles of Elevation and Depression"],["8.3","Simple Three-dimensional Problems"]]},{"n":9,"title":"Arc Lengths, Sector Areas and Radian Measure","sections":[["9.1","Arc Lengths"],["9.2","Sector Areas and Segment Areas"],["9.3","Radian Measure"],["9.4","Arc Length and Sector Area in Radian Measure"]]},{"n":10,"title":"Properties of Circles","sections":[["10.1","Chords of a Circle"],["10.2","Angles at the Circumference"],["10.3","Angles in the Same Segment and Opposite Segments"],["10.4","Tangents to a Circle"]]}],"4":[{"n":1,"title":"Set Language and Notation","sections":[["1.1","Set Language"],["1.2","Venn Diagrams and Complement of a Set"],["1.3","Intersection and Union of Sets"]]},{"n":2,"title":"Data Analysis – Measures of Spread","sections":[["2.1","Cumulative Frequency Diagrams"],["2.2","Range, Quartiles, Interquartile Range and Percentiles"],["2.3","Box-and-Whisker Plots"],["2.4","Standard Deviation for Ungrouped Data"],["2.5","Standard Deviation for Grouped Data"]]},{"n":3,"title":"Probability","sections":[["3.1","Probability of Simple Combined Events"],["3.2","Mutually Exclusive Events and Addition Law of Probabilities"],["3.3","Independent Events and Multiplication Law of Probabilities"]]},{"n":4,"title":"Matrices","sections":[["4.1","Definition of a Matrix"],["4.2","Addition and Subtraction of Matrices"],["4.3","Matrix Multiplication"],["4.4","Applications of Matrices"]]},{"n":5,"title":"Vectors in Two Dimensions","sections":[["5.1","Introduction to Vectors"],["5.2","Addition and Subtraction of Vectors"],["5.3","Scalar Multiplication of Vectors"],["5.4","Position Vectors"],["5.5","Applications of Vectors"]]}]};
+const BOOKS = [["NDM", "New Discovering Mathematics"], ["FREE", "Not tied to a textbook"]];
+// questions that do not come from a textbook are filed by area of mathematics
+const TOPICS = ["Numbers / Algebra", "Shapes / Geometry", "Changes / Precalculus", "Data and Uncertainty / Probability and Statistics"];
+const isFree = (d) => d && d.book === "FREE";
+const TYPES = ["Worked example", "Exercise"];
+const CATS = ["Concept", "Procedure", "Problem solving"];
+function fill(sel, items, first) {
+  const v = sel.value; sel.textContent = "";
+  if (first !== null) sel.add(new Option(first, ""));
+  for (const it of items) { const [val, lab] = Array.isArray(it) ? it : [it, it]; sel.add(new Option(lab, val)); }
+  if ([...sel.options].some((o) => o.value === v)) sel.value = v;
+}
+const volItems = () => Object.keys(TOC).map((v) => [v, "Book " + v]);
+const chapItems = (vol) => (TOC[vol] || []).map((c) => [String(c.n), `${c.n} ${c.title}`]);
+function secItems(vol, chap) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(chap)); return c ? c.sections.map(([n, t]) => [n, `${n} ${t}`]) : []; }
+// one set of BOOK/VOLUME/CHAPTER/SECTION/TYPE/CATEGORY selects; p = id prefix, first = label of the empty choice
+function cascade(p, first) {
+  const vol = $(p + "Vol"), chap = $(p + "Chap"), sec = $(p + "Sec");
+  fill(chap, chapItems(vol.value), vol.value ? first : (first === "All" ? "All" : "Choose a volume")); chap.disabled = !vol.value;
+  fill(sec, secItems(vol.value, chap.value), chap.value ? first : (first === "All" ? "All" : "Choose a chapter")); sec.disabled = !chap.value;
+}
+function setupSelects(p, first) {
+  fill($(p + "Book"), BOOKS, first); fill($(p + "Vol"), volItems(), first);
+  fill($(p + "Type"), TYPES, first); fill($(p + "Cat"), CATS, first);
+  fill($(p + "Topic"), TOPICS, first);
+  $(p + "Vol").addEventListener("change", () => { $(p + "Chap").value = ""; $(p + "Sec").value = ""; cascade(p, first); });
+  $(p + "Chap").addEventListener("change", () => { $(p + "Sec").value = ""; cascade(p, first); });
+  $(p + "Book").addEventListener("change", () => syncBook(p));
+  cascade(p, first); syncBook(p);
+}
+// a textbook question has volume, chapter and section; a question not tied to a textbook has a topic instead
+function syncBook(p) {
+  const free = $(p + "Book").value === "FREE";
+  for (const id of ["Vol", "Chap", "Sec"]) $(p + id).closest("label").hidden = free;
+  $(p + "Topic").closest("label").hidden = !free;
+}
+function tagGrid(el, p) {
+  el.innerHTML = `<label class="field"><span>BOOK</span><select id="${p}Book"></select></label>
+  <label class="field wide"><span>TOPIC</span><select id="${p}Topic"></select></label>
+  <label class="field"><span>VOLUME</span><select id="${p}Vol"></select></label>
+  <label class="field"><span>CHAPTER</span><select id="${p}Chap"></select></label>
+  <label class="field wide"><span>SECTION</span><select id="${p}Sec"></select></label>
+  <label class="field"><span>TYPE</span><select id="${p}Type"></select></label>
+  <label class="field"><span>CATEGORY</span><select id="${p}Cat"></select></label>
+  <label class="field"><span>NUMBER</span><input id="${p}Num" placeholder="e.g. 4 or 3a"></label>`;
+  setupSelects(p, "—");
+}
+function setTags(p, t) {
+  $(p + "Book").value = t.book || "NDM"; $(p + "Vol").value = t.volume || ""; cascade(p, "—");
+  $(p + "Chap").value = t.chapter ? String(t.chapter) : ""; cascade(p, "—");
+  $(p + "Sec").value = t.section || ""; $(p + "Topic").value = t.topic || ""; syncBook(p);
+  $(p + "Type").value = t.type || ""; $(p + "Cat").value = t.category || ""; $(p + "Num").value = t.number || "";
+}
+function readTags(p) {
+  const free = $(p + "Book").value === "FREE";
+  return { book: $(p + "Book").value, topic: free ? $(p + "Topic").value : "",
+    volume: free ? "" : $(p + "Vol").value, chapter: !free && $(p + "Chap").value ? Number($(p + "Chap").value) : "",
+    section: free ? "" : $(p + "Sec").value, type: $(p + "Type").value, category: $(p + "Cat").value, number: $(p + "Num").value.trim() };
+}
+// where a question sits in the tree, as filter values
+const locOf = (d) => isFree(d) ? { root: "free", topic: d.topic || "", vol: "", chap: "", sec: "" }
+  : { root: "ndm", topic: "", vol: d.volume || "", chap: d.chapter ? String(d.chapter) : "", sec: d.section || "" };
+function chapTitle(vol, n) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(n)); return c ? c.title : ""; }
+function secTitle(vol, n, s) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(n)); const x = c && c.sections.find((z) => z[0] === s); return x ? x[1] : ""; }
+const plain = (lines) => (lines || []).join(" ").replace(/\\[a-zA-Z]+|[${}^_]/g, " ").replace(/\s+/g, " ").trim();
+// left sidebar: tags of the question on screen, and the questions that match the filters
+function renderSide(o) { renderTree(o); }
+// textbook tree: Book -> chapter -> section -> questions (Q1, Q2 ... in the order they were added)
+let openKeys = new Set();
+try { openKeys = new Set(JSON.parse(localStorage.getItem("tb_open") || "[]")); } catch (e) {}
+function saveOpen() { try { localStorage.setItem("tb_open", JSON.stringify([...openKeys])); } catch (e) {} }
+try { if (!localStorage.getItem("tb_open2")) { openKeys.add("r:ndm"); localStorage.setItem("tb_open2", "1"); saveOpen(); } } catch (e) {}
+let lastReveal = null;
+function setLoc(v, c, s) { B.f.root = v ? "ndm" : ""; B.f.topic = ""; B.f.vol = v; B.f.chap = c; B.f.sec = s; applyFilters(null); }
+function setRoot(r) { B.f.root = r; B.f.topic = ""; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
+function setTopic(t) { B.f.root = "free"; B.f.topic = t; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
+// a question is named by its type and the number the teacher gave it: "Example 4", "Exercise 3a"
+const typeWord = (d) => d.type === "Worked example" ? "Example" : d.type === "Exercise" ? "Exercise" : "Question";
+const qName = (d) => typeWord(d) + (d.number ? " " + d.number : "");
+// order: textbook questions by volume, chapter, section; then examples before exercises; then by number
+const typeRank = (d) => d.type === "Worked example" ? 0 : d.type === "Exercise" ? 1 : 2;
+const natCmp = (x, y) => String(x ?? "").localeCompare(String(y ?? ""), undefined, { numeric: true });
+function cmpQ(a, b) {
+  return (isFree(a) - isFree(b)) || natCmp(a.volume, b.volume) || natCmp(a.chapter, b.chapter) || natCmp(a.section, b.section) || natCmp(a.topic, b.topic) ||
+    (typeRank(a) - typeRank(b)) || (!a.number - !b.number) || natCmp(a.number, b.number) || ((a.createdAt || 0) - (b.createdAt || 0));
+}
+// drag a question onto a branch to move it, or onto another question to replace it
+let dragId = null;
+const canMove = () => !!db && canWrite;
+function dropTarget(sum, det, key, dest) {
+  let tm = null;
+  sum.addEventListener("dragover", (e) => { if (!dragId) return; e.preventDefault(); sum.classList.add("drop"); if (!det.open && !tm) tm = setTimeout(() => { det.open = true; openKeys.add(key); saveOpen(); }, 600); });
+  sum.addEventListener("dragleave", () => { sum.classList.remove("drop"); clearTimeout(tm); tm = null; });
+  sum.addEventListener("drop", (e) => { e.preventDefault(); sum.classList.remove("drop"); clearTimeout(tm); tm = null; const src = dragId; dragId = null; if (src) moveQuestion(src, dest); });
+}
+async function moveQuestion(srcId, dest) {
+  const d = B.all.find((x) => x.id === srcId); if (!d || !canMove()) return;
+  try {
+    await db.doc("bank/" + srcId).update({ ...dest, updatedAt: Date.now() });
+    Object.assign(d, dest); Object.assign(B.f, locOf(d)); lastReveal = null; applyFilters(srcId); toast(qName(d) + " moved");
+  } catch (e) { toast("Couldn't move the question. Try again."); }
+}
+// dropping a question on another one swaps their places (section, type and number)
+async function askReplace(srcId, tgtId) {
+  const a = B.all.find((x) => x.id === srcId), t = B.all.find((x) => x.id === tgtId); if (!a || !t || !canMove()) return;
+  const pick = (d) => ({ book: d.book || "NDM", volume: d.volume || "", chapter: d.chapter || "", section: d.section || "", topic: d.topic || "", type: d.type || "", number: d.number || "" });
+  const pa = pick(a), pt = pick(t), na = qName(a), nt = qName(t), now = Date.now();
+  try {
+    await db.doc("bank/" + srcId).update({ ...pt, updatedAt: now });
+    await db.doc("bank/" + tgtId).update({ ...pa, updatedAt: now });
+    Object.assign(a, pt); Object.assign(t, pa); Object.assign(B.f, locOf(a)); lastReveal = null; applyFilters(srcId);
+    toast(`${na} and ${nt} swapped places`);
+  } catch (e) { toast("Couldn't swap the questions. Try again."); }
+}
+function renderTree(o) {
+  const tree = $("tree"); tree.textContent = "";
+  const f = B.f, pool = B.all.filter(nonLoc), searching = !!f.q.trim();
+  const count = (fn) => pool.reduce((n, d) => n + (fn(d) ? 1 : 0), 0);
+  // when the question on screen changes, open the branch it sits in once; after that the viewer's own open/close choices rule
+  if (o && o.id && o.id !== lastReveal) {
+    lastReveal = o.id;
+    if (isFree(o)) { openKeys.add("r:free"); openKeys.add("t:" + (o.topic || "")); saveOpen(); }
+    else if (o.volume) { openKeys.add("r:ndm"); openKeys.add("v:" + o.volume); openKeys.add(`c:${o.volume}:${o.chapter}`); openKeys.add(`s:${o.volume}:${o.section}`); saveOpen(); }
+  }
+  const auto = new Set();
+  if (searching) for (const d of pool) {
+    if (isFree(d)) { auto.add("r:free"); auto.add("t:" + (d.topic || "")); }
+    else { auto.add("r:ndm"); auto.add("v:" + d.volume); auto.add(`c:${d.volume}:${d.chapter}`); auto.add(`s:${d.volume}:${d.section}`); }
+  }
+  const all = document.createElement("button"); all.type = "button"; all.className = "node" + (!f.root && !f.vol ? " sel" : "");
+  all.innerHTML = '<span class="t"></span><span class="cnt"></span>'; all.firstChild.textContent = "All questions"; all.lastChild.textContent = pool.length;
+  all.onclick = () => setRoot(""); tree.append(all);
+  const node = (key, label, n, selected, onSelect, dest) => {
+    const det = document.createElement("details"); det.open = openKeys.has(key) || auto.has(key);
+    const sum = document.createElement("summary");
+    if (selected) { sum.classList.add("sel"); sum.setAttribute("aria-current", "true"); }
+    if (!n) sum.classList.add("dim");
+    const t = document.createElement("span"); t.className = "t"; t.textContent = label;
+    const c = document.createElement("span"); c.className = "cnt"; c.textContent = n || "";
+    sum.append(t, c);
+    sum.addEventListener("click", (e) => {
+      e.preventDefault();
+      // an open branch closes; a closed one opens and becomes the filter
+      if (det.open) { openKeys.delete(key); auto.delete(key); saveOpen(); render(); }
+      else { openKeys.add(key); saveOpen(); onSelect(); }
+    });
+    if (dest && canMove()) dropTarget(sum, det, key, dest);
+    det.append(sum); return det;
+  };
+  const leaves = (list) => {
+    const box = document.createElement("div"); box.className = "leaves";
+    for (const d of list) {
+      const b = document.createElement("div"); b.setAttribute("role", "button"); b.tabIndex = 0; b.className = "leaf" + (o && d.id === o.id ? " cur" : "");
+      if (o && d.id === o.id) b.setAttribute("aria-current", "true");
+      const h = document.createElement("b"); h.textContent = qName(d);
+      const s = document.createElement("span"); s.textContent = plain(d.question).slice(0, 80);
+      b.append(h, s);
+      const open = () => { Object.assign(B.f, locOf(d)); applyFilters(d.id); if (matchMedia("(max-width: 900px)").matches) setSide(false); };
+      b.onclick = open; b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+      if (d.id && canMove()) {
+        b.draggable = true;
+        b.addEventListener("dragstart", (e) => { dragId = d.id; e.dataTransfer.setData("text/plain", d.id); e.dataTransfer.effectAllowed = "move"; });
+        b.addEventListener("dragend", () => { dragId = null; });
+        b.addEventListener("dragover", (e) => { if (dragId && dragId !== d.id) { e.preventDefault(); b.classList.add("drop"); } });
+        b.addEventListener("dragleave", () => b.classList.remove("drop"));
+        b.addEventListener("drop", (e) => { e.preventDefault(); b.classList.remove("drop"); const src = dragId; dragId = null; if (src && src !== d.id) askReplace(src, d.id); });
+      }
+      box.append(b);
+    }
+    return box;
+  };
+  const freePool = pool.filter(isFree), ndmPool = pool.filter((d) => !isFree(d));
+  const rootNdm = node("r:ndm", "New Discovering Mathematics", ndmPool.length, f.root === "ndm" && !f.vol, () => setRoot("ndm"));
+  for (const v of Object.keys(TOC)) {
+    const inV = (d) => !isFree(d) && d.volume === v;
+    const dv = node("v:" + v, "Book " + v, count(inV), f.vol === v && !f.chap, () => setLoc(v, "", ""), { book: "NDM", volume: v, chapter: "", section: "", topic: "" });
+    for (const ch of TOC[v]) {
+      const cn = String(ch.n), inC = (d) => inV(d) && String(d.chapter) === cn;
+      const dc = node(`c:${v}:${cn}`, `${cn} ${ch.title}`, count(inC), f.vol === v && f.chap === cn && !f.sec, () => setLoc(v, cn, ""), { book: "NDM", volume: v, chapter: Number(cn), section: "", topic: "" });
+      for (const [sn, st] of ch.sections) {
+        const inS = (d) => inC(d) && d.section === sn;
+        const qs = pool.filter(inS);
+        const ds = node(`s:${v}:${sn}`, `${sn} ${st}`, qs.length, f.vol === v && f.sec === sn, () => setLoc(v, cn, sn), { book: "NDM", volume: v, chapter: Number(cn), section: sn, topic: "" });
+        if (qs.length) ds.append(leaves(qs));
+        dc.append(ds);
+      }
+      const loose = pool.filter((d) => inC(d) && !ch.sections.some((s) => s[0] === d.section));
+      if (loose.length) { const dl = node(`s:${v}:${cn}:none`, "No section", loose.length, false, () => setLoc(v, cn, "")); dl.append(leaves(loose)); dc.append(dl); }
+      dv.append(dc);
+    }
+    rootNdm.append(dv);
+  }
+  const unfiled = ndmPool.filter((d) => !TOC[d.volume] || !TOC[d.volume].some((c) => String(c.n) === String(d.chapter)));
+  if (unfiled.length) { const du = node("v:none", "Not filed", unfiled.length, false, () => setRoot("ndm")); du.append(leaves(unfiled)); rootNdm.append(du); }
+  tree.append(rootNdm);
+  // not tied to a textbook: four areas of mathematics
+  const rootFree = node("r:free", "Not tied to a textbook", freePool.length, f.root === "free" && !f.topic, () => setRoot("free"));
+  for (const t of TOPICS) {
+    const qs = freePool.filter((d) => d.topic === t);
+    const dt = node("t:" + t, t, qs.length, f.root === "free" && f.topic === t, () => setTopic(t), { book: "FREE", topic: t, volume: "", chapter: "", section: "" });
+    if (qs.length) dt.append(leaves(qs));
+    rootFree.append(dt);
+  }
+  const noTopic = freePool.filter((d) => !TOPICS.includes(d.topic));
+  if (noTopic.length) { const dn = node("t:", "No topic", noTopic.length, false, () => setRoot("free")); dn.append(leaves(noTopic)); rootFree.append(dn); }
+  tree.append(rootFree);
+  if (!B.all.length) { const p = document.createElement("p"); p.className = "note"; p.style.margin = "6px 0 0"; p.textContent = "The bank is empty. Add a question with New question."; tree.append(p); }
+}
+function setSide(open) {
+  $("side").classList.toggle("closed", !open); $("sideBtn").setAttribute("aria-expanded", String(open));
+  try { localStorage.setItem("tb_side", open ? "1" : "0"); } catch (e) {}
+}
+
+/* ---------------- text + math ---------------- */
+// split "text $tex$ text" into segments; \$ is a literal dollar sign
+function segments(s) {
+  const t = String(s ?? "").replace(/\\\$/g, "\u0001");
+  const out = []; let last = 0; const re = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g; let m;
+  while ((m = re.exec(t))) {
+    if (m.index > last) out.push({ k: "t", v: t.slice(last, m.index) });
+    out.push({ k: "m", v: (m[1] ?? m[2]).replace(/\u0001/g, "\\$"), display: !!m[1] });
+    last = re.lastIndex;
+  }
+  if (last < t.length) out.push({ k: "t", v: t.slice(last) });
+  return out.map((x) => x.k === "t" ? { ...x, v: x.v.replace(/\u0001/g, "$") } : x);
+}
+function labelOf(line) { const m = /^\s*(\((?:[a-z]|\d{1,2}|i{1,3}|iv|v|vi{0,3})\))\s*/.exec(line); return m ? [m[1], line.slice(m[0].length)] : [null, line]; }
+
+/* ---------------- parts: a long question is shown one part at a time ---------------- */
+const ROMAN = /^\((i|ii|iii|iv|v|vi)\)$/;
+const FOOTER = /^(give|leave|express|take|use|round|show your|hint|note|state your|correct your)\b/i; // closing sentences that belong to every part
+// Split lines into: shared lead-in (pre), top-level parts (a)(b)… or (1)(2)…, and shared closing sentences (post). Sub-parts (i)(ii) stay with their part.
+function groupParts(lines) {
+  const pre = [], parts = [], post = []; let cur = null;
+  for (const raw of lines || []) {
+    const cont = raw.charCodeAt(0) === 2;
+    const [lbl] = cont ? [null] : labelOf(raw);
+    if (lbl) {
+      const isSub = cur && !ROMAN.test(cur.label) && ROMAN.test(lbl) && !(cur.label === "(h)" && lbl === "(i)");
+      if (isSub) { cur.lines.push(raw); continue; }
+      if (cur && cur.label === lbl) { cur.lines.push(raw); continue; }
+      cur = { label: lbl, lines: [raw] }; parts.push(cur); continue;
+    }
+    if (!cur) pre.push(raw);
+    else if (FOOTER.test(raw.trim())) post.push(raw);
+    else cur.lines.push(raw);
+  }
+  return { pre, parts, post };
+}
+// what is on screen for question q: all of it, or one part (with the lead-in, the closing sentences, and that part's answer and solution)
+function partView(q) {
+  const g = groupParts(q.question), n = g.parts.length;
+  const auto = n >= 3 || (n >= 2 && plain(q.question).length > 280);
+  const split = n >= 2 && (S.split === null ? auto : S.split);
+  const figs = q.answer_figures || [];
+  if (!split) return { n, split: false, label: "", question: q.question, answer: q.answer, solution: q.solution, figs };
+  const i = Math.min(Math.max(S.part, 0), n - 1); S.part = i;
+  const P = g.parts[i];
+  const pick = (lines) => { const gg = groupParts(lines), m = gg.parts.find((x) => x.label === P.label); return m ? [...gg.pre, ...m.lines, ...gg.post] : lines; };
+  return { n, split: true, i, label: P.label, question: [...g.pre, ...P.lines, ...g.post], answer: pick(q.answer), solution: pick(q.solution),
+    figs: figs.filter((f) => f.part === P.label || f.part === "") };
+}
+const mjReady = () => (window.MathJax && MathJax.startup && MathJax.startup.promise) ? MathJax.startup.promise : Promise.reject(new Error("MathJax not loaded"));
+// MathJax's own stylesheet (glyph definitions and the rule that hides its screen-reader copy) is not added automatically in this setup
+mjReady().then(() => { try { document.head.appendChild(MathJax.svgStylesheet()); } catch (e) {} }).catch(() => {});
+
+// text with $math$ inside any element
+function appendRich(parent, text) {
+  for (const sg of segments(text)) {
+    if (sg.k === "t") { parent.append(document.createTextNode(sg.v)); continue; }
+    const holder = document.createElement("span"); holder.textContent = sg.v; parent.append(holder);
+    mjReady().then(() => { try { holder.replaceWith(MathJax.tex2svg(sg.v, { display: sg.display })); } catch (e) {} }).catch(() => {});
+  }
+}
+// A part's label such as (a) belongs on the first line of that part only. Later lines that repeat it get the marker \u0002 (a continuation) so it shows once.
+function dedupe(lines) {
+  let last = null;
+  return (lines || []).map((raw) => {
+    const [lbl, rest] = labelOf(String(raw));
+    if (!lbl) return raw;
+    if (lbl === last) return "\u0002" + rest;
+    last = lbl; return raw;
+  });
+}
+function renderLines(el, lines) {
+  el.textContent = "";
+  for (const raw of lines || []) {
+    const cont = raw.charCodeAt(0) === 2;
+    const [lbl, rest] = cont ? [null, raw.slice(1)] : labelOf(raw);
+    const p = document.createElement("p");
+    if (cont) p.className = "part cont";
+    if (lbl) { p.className = /^\((i|ii|iii|iv|v|vi)\)$/.test(lbl) ? "sub" : "part"; const b = document.createElement("span"); b.className = "lbl"; b.textContent = lbl + " "; p.append(b); }
+    appendRich(p, rest);
+    el.append(p);
+  }
+}
+// worked solution: one block per part, the label once as a heading, every step a bullet
+function renderSolution(el, lines) {
+  el.textContent = "";
+  let grp = null, ul = null;
+  const open = (lbl) => {
+    grp = document.createElement("div"); grp.className = "grp";
+    if (lbl) { const h = document.createElement("p"); h.className = "gl"; h.textContent = lbl; grp.append(h); }
+    ul = document.createElement("ul"); grp.append(ul); el.append(grp);
+  };
+  let last = null;
+  for (const raw of lines || []) {
+    const [lbl, rest] = raw.charCodeAt(0) === 2 ? [null, raw.slice(1)] : labelOf(raw);
+    if (lbl && lbl !== last) { open(lbl); last = lbl; } else if (!grp) open(null);
+    const li = document.createElement("li"); appendRich(li, rest); ul.append(li);
+  }
+}
+
+/* ---------------- figures (model SVG, shown through <img> so scripts never run) ---------------- */
+function cleanSvg(svg) {
+  if (!svg || !/<svg[\s>]/i.test(svg)) return null;
+  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() !== "svg" || doc.querySelector("parsererror")) return null;
+  root.querySelectorAll("script,foreignObject,iframe,image,use").forEach((n) => n.remove());
+  root.querySelectorAll("*").forEach((n) => { for (const a of [...n.attributes]) if (/^on/i.test(a.name) || /href/i.test(a.name)) n.removeAttribute(a.name); });
+  if (!root.getAttribute("xmlns")) root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const vb = (root.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+  if (!root.getAttribute("width") && vb.length === 4) { root.setAttribute("width", vb[2]); root.setAttribute("height", vb[3]); }
+  return new XMLSerializer().serializeToString(root);
+}
+let figUrl = null;
+function showFigure(svg) {
+  const s = cleanSvg(svg);
+  if (figUrl) { URL.revokeObjectURL(figUrl); figUrl = null; }
+  if (!s) { $("qFig").hidden = true; return; }
+  figUrl = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" }));
+  $("qFigImg").src = figUrl; $("qFig").hidden = false;
+}
+function svgToPng(svg) {
+  return new Promise((resolve) => {
+    const s = cleanSvg(svg); if (!s) return resolve(null);
+    const url = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" }));
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || 400, h = img.naturalHeight || 300, k = 3;
+      const c = document.createElement("canvas"); c.width = w * k; c.height = h * k;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => resolve(b ? { blob: b, w, h } : null), "image/png");
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+/* ---------------- render teaching view ---------------- */
+function renderTabs() {
+  const box = $("vTabs"); box.textContent = "";
+  if (!S.orig) return;
+  const mk = (label, vi) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "tab" + (vi >= 0 ? " v" : "") + (S.vi === vi ? " cur" : ""); b.textContent = label;
+    if (S.vi === vi) b.setAttribute("aria-current", "true");
+    b.onclick = () => { S.vi = vi; render(); }; box.append(b);
+  };
+  mk(S.orig.example ? "Original (example)" : "Original", -1);
+  S.variants.forEach((_, i) => mk("Variant " + (i + 1), i));
+}
+let ansKey = null, afUrls = [];
+// drawings that are part of the answer (a histogram, a graph …) are shown under the answer lines
+function paintAnsFigs(figs) {
+  afUrls.forEach((u) => URL.revokeObjectURL(u)); afUrls = [];
+  const box = $("ansFigs"); box.textContent = "";
+  for (const f of figs || []) {
+    const s = cleanSvg(f.svg); if (!s) continue;
+    const url = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" })); afUrls.push(url);
+    const fig = document.createElement("figure"); const img = document.createElement("img"); img.src = url; img.alt = "Figure for the answer " + (f.part || "");
+    fig.append(img); box.append(fig);
+  }
+}
+function paintAnswer() {
+  const q = cur(), card = $("ansCard");
+  if (!S.answer || !q) { card.hidden = true; ansKey = null; return; }
+  card.classList.toggle("variant", S.vi >= 0);
+  const pv = partView(q);
+  $("ansTitle").textContent = (S.vi < 0 ? "ORIGINAL" : `VARIANT ${S.vi + 1}`) + (pv.split ? ` · PART ${pv.i + 1} OF ${pv.n}` : "") + " · ANSWER";
+  // the figure for the answer is drawn automatically, once per question; the button only appears as a retry after a failure
+  if (!figBusy) { $("figBtn").hidden = !(figFail === q); $("figBtn").textContent = "Drawing failed. Try again"; $("figBtn").disabled = false; }
+  if (sample && !figBusy && figFail !== q && !(q.answer_figures || []).length && !q.figs_checked) setTimeout(() => autoFig(q), 0);
+  const key = (S.orig && S.orig.id || "x") + ":" + S.vi + ":" + (pv.split ? pv.label : "") + ":" + (pv.answer || []).join("|") + "#" + (pv.solution || []).join("|") + "#" + pv.figs.map((f) => f.svg.length).join(",");
+  if (key !== ansKey || card.hidden) {
+    ansKey = key;
+    renderLines($("ansBody"), pv.answer); renderSolution($("solBody"), pv.solution); paintAnsFigs(pv.figs);
+    $("solBody").hidden = true; $("solBtn").textContent = "Show solution"; card.scrollTop = 0;
+  }
+  card.classList.add("expanded"); // always the whole blank area under the question, above the buttons
+  card.hidden = false;
+}
+function render() {
+  if (S.vi >= S.variants.length) S.vi = S.variants.length - 1;
+  const q = cur();
+  const isVar = S.vi >= 0;
+  const o = S.orig;
+  // bank position and tags of the original
+  $("posQ").textContent = B.list.length ? `${B.idx + 1} of ${B.list.length}` : (o && o.example ? "Example" : "0 of 0");
+  $("prevQ").disabled = B.idx <= 0; $("nextQ").disabled = B.idx < 0 || B.idx >= B.list.length - 1;
+  renderSide(o);
+  $("tagBtn").hidden = $("delBtn").hidden = !(o && o.id && db && canWrite);
+  $("newBtn").hidden = !canWrite; if (typeof refreshAdmin === "function") refreshAdmin(); // readers (students) can browse and make their own variants, not add or change questions
+  renderTabs();
+  $("bAns").disabled = !q; $("bExp").disabled = !q;
+  $("bAns").classList.toggle("v", isVar); $("bExp").classList.toggle("v", isVar);
+  $("bVar").disabled = !o || !sample;
+  if (!q) {
+    const qt = $("qText"); qt.textContent = "";
+    const p = document.createElement("p"); p.className = "empty";
+    p.textContent = !B.loaded && db ? "Loading the question bank…" : "No questions match these filters. Change a filter, or add one with New question.";
+    qt.append(p); showFigure(""); paintAnswer(); return;
+  }
+  const pk = (o && o.id || "x") + ":" + S.vi;
+  if (pk !== lastPartKey) { lastPartKey = pk; S.part = 0; }
+  const pv = partView(q);
+  renderLines($("qText"), pv.question);
+  showFigure(q.figure_svg);
+  const bar = $("partBar"); bar.hidden = pv.n < 2;
+  if (pv.n >= 2) {
+    $("partPrev").hidden = $("partNext").hidden = !pv.split;
+    $("partPos").textContent = pv.split ? `${pv.i + 1} / ${pv.n}` : `${pv.n} parts`;
+    if (pv.split) { $("partPrev").disabled = pv.i <= 0; $("partNext").disabled = pv.i >= pv.n - 1; }
+    $("partToggle").textContent = pv.split ? "Show all parts" : "One part at a time";
+  }
+  paintAnswer();
+}
+let lastPartKey = null;
+$("partPrev").onclick = () => { S.part = Math.max(0, S.part - 1); render(); };
+$("partNext").onclick = () => { S.part += 1; render(); };
+$("partToggle").onclick = () => { const q = cur(); if (!q) return; S.split = !partView(q).split; S.part = 0; render(); };
+$("solBtn").onclick = () => {
+  const h = !$("solBody").hidden; $("solBody").hidden = h; $("solBtn").textContent = h ? "Show solution" : "Hide solution";
+  $("ansCard").scrollTop = 0;
+};
+$("ansClose").onclick = () => { S.answer = false; paintAnswer(); };
+// ask Claude to draw what the answer needs (a histogram, graph, number line, …) and keep it with the question
+let figBusy = false, figFail = null;
+$("figBtn").onclick = () => { const q = cur(); if (q) { figFail = null; autoFig(q); } };
+async function autoFig(q) {
+  if (!q || !sample || figBusy) return;
+  figBusy = true; figFail = null;
+  const btn = $("figBtn"), t0 = Date.now(); btn.hidden = false; btn.disabled = true;
+  const tick = () => { btn.textContent = "Checking whether the answer needs a drawing… " + Math.round((Date.now() - t0) / 1000) + " s"; };
+  tick(); const tm = setInterval(tick, 1000);
+  const prompt = `A maths question with its answer and worked solution:
+Question:
+${q.question.join("\n")}
+${q.figure_svg ? "\nDiagram given in the question (SVG):\n" + q.figure_svg + "\n" : ""}
+Answer:
+${q.answer.join("\n")}
+
+Solution:
+${q.solution.join("\n")}
+
+Decide whether the correct answer includes something to draw: a histogram, graph, number line, net, construction or labelled diagram that the question asks for. If it does, draw it accurately from the data in the question and the working above: work out every count, height and position first, label both axes with their scales, and give every part that needs a drawing its own figure.
+Reply with ONLY one JSON object, no other text: {"answer_figures": [{"part": "(1)", "svg": "<svg ...>", "grid": object or null}]}
+- "part" is the label of the part exactly as in the answer lines, or "" when the question has no parts.
+- "svg" is ${SVG_RULES}
+- Use [] if no drawing is needed.`;
+  const ac = new AbortController(); ctl = ac;
+  const o = S.orig;
+  try {
+    const r = await sample.json(prompt, { signal: ac.signal, modelTier: "complex", cache: false });
+    const figs = cleanFigs(r.answer_figures);
+    q.answer_figures = figs; q.figs_checked = true; ansKey = null;
+    if (o && o.id && db && canWrite) {
+      try { await db.doc("bank/" + o.id).update(S.vi < 0 ? { answer_figures: figs, figs_checked: true } : { variants: S.variants }); }
+      catch (e) { toast("The figure is on screen but couldn't be saved with the question."); }
+    }
+  } catch (e) { if (!e || e.code !== "cancelled") { figFail = q; toast(codeMsg(e)); } }
+  finally { clearInterval(tm); figBusy = false; btn.disabled = false; render(); }
+}
+$("bAns").onclick = () => { S.answer = !S.answer; paintAnswer(); };
+
+/* ---------------- Claude ---------------- */
+let sample = null, imgLimits = null, ctl = null, db = null, canWrite = false;
+// graphs with axes are drawn on grid paper so heights and positions can be read off
+const GRID = `GRAPHS ON GRID PAPER: when a diagram is a statistical or coordinate graph (histogram, bar chart, line graph, scatter plot, function graph, scaled number line), do NOT draw grid lines yourself: the page draws the grid paper behind your drawing. Instead give a grid object describing the plotting area: {"x0": svg x of the left end of the x scale, "x1": svg x of the right end, "xMin": the value at x0, "xMax": the value at x1, "xMajor": spacing of the labelled x ticks, "xMinor": spacing of the grid lines in x, "y0": svg y of the BOTTOM of the y scale, "y1": svg y of the TOP, "yMin": the value at y0, "yMax": the value at y1, "yMajor": spacing of the labelled y ticks, "yMinor": spacing of the grid lines in y}. Choose the minor spacing so the grid is easy to read (for example 1 when the labelled ticks are 5 apart, 2 when they are 10 apart). The axes, ticks, bars, points and labels must use exactly the same scale as the grid object, and nothing may fill the plotting area with an opaque background. The grid object is null when the diagram is not a graph.`;
+const FORMAT = `Reply with ONLY one JSON object, no other text:
+{"question": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer": [string, ...], "solution": [string, ...], "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
+Rules for the strings:
+- Keep the original language of the question (English stays English, Chinese stays Chinese). Do not translate.
+- "question": one string per paragraph. Each sub-question is its own string starting with its label, e.g. "(a) Find ...", "(i) ...".
+- Write every mathematical expression, variable, fraction, root, angle and equation in LaTeX between single dollar signs, e.g. "$\\\\frac{3}{4}x^2$". Units stay as plain text after the math (e.g. "$24$ cm²" or "24 cm²"). A literal money sign is written \\\\$ (backslash dollar).
+- Separate formatting from content: say each thing once. Never write an expression both as LaTeX and again as plain text (not "$t$ t", not "$x = 3$ x = 3"), and never put LaTeX commands or dollar signs outside the math delimiters.
+- "figure_svg": "" if the question has no diagram. Otherwise a clean redrawing of the diagram as one standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 420, a white background rect, black strokes (stroke-width 2), light grey fills only, dashed lines (stroke-dasharray="6 5") for hidden edges, every label and given length from the original placed beside the right point or side, text in font-family "Times New Roman, serif" font-size 20 (vertex letters italic). No scripts, no images, no external references. ${GRID}
+- "answer": the final answer of each part, one string per part, with its label.
+- "solution": a clear step-by-step worked solution, one short line per string. Write a part's label such as "(a)" only on the FIRST line of that part; every later step of the same part has no label. A question without parts has no labels at all. Check every calculation.
+- "answer_figures": [] unless the answer itself is a drawing that the question asks for (a histogram, graph, number line, net, construction or labelled diagram). Then one {"part": "(1)", "svg": "<svg ...>"} for each part that needs a drawing, with "part" exactly as that part is labelled in "answer" ("" when the question has no parts). Draw it accurately from the data: work out every count, height and position first, label both axes and the scale, and follow the same SVG rules as "figure_svg".`;
+const SVG_RULES = `a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels and numbers in font-family "Times New Roman, serif" font-size 18. No scripts, no images, no external references. ${GRID}`;
+
+function codeMsg(e) {
+  const c = e && e.code;
+  return ({
+    not_granted: "This page isn't allowed to use Claude, so it can't read or write questions.",
+    sampling_disabled: "Claude isn't available in pages for this account.",
+    rate_limited: "Claude's usage limit has been reached for now. Try again later.",
+    invalid_json: "Claude's reply was incomplete. Press the button again.",
+    image_rejected: "The image couldn't be read. Use a JPG or PNG, or a smaller image.",
+    images_unavailable: "Images can't be sent from this view. Type the question instead.",
+    refused: "Claude couldn't handle this question. Reword it and try again.",
+    session_expired: "Your sign-in has expired. Sign in to claude.ai again.",
+    prompt_too_large: "The question is too long. Enter it in smaller parts.",
+    cancelled: "Stopped."
+  })[c] || "Something went wrong with the connection. Try again.";
+}
+// put grid paper behind a graph: the model gives the plotting area and scale, the page draws the lines so they always line up
+function withGrid(svg, g) {
+  if (typeof svg !== "string" || !g || typeof g !== "object" || /data-grid=/.test(svg)) return svg;
+  const n = (k) => Number(g[k]);
+  if (["x0", "x1", "y0", "y1", "xMin", "xMax", "yMin", "yMax", "xMinor", "yMinor"].some((k) => !Number.isFinite(n(k)))) return svg;
+  if (n("xMax") <= n("xMin") || n("yMax") <= n("yMin") || n("xMinor") <= 0 || n("yMinor") <= 0) return svg;
+  const nx = Math.round((n("xMax") - n("xMin")) / n("xMinor")), ny = Math.round((n("yMax") - n("yMin")) / n("yMinor"));
+  if (nx < 1 || ny < 1 || nx > 300 || ny > 300) return svg;
+  const X = (v) => n("x0") + (v - n("xMin")) / (n("xMax") - n("xMin")) * (n("x1") - n("x0"));
+  const Y = (v) => n("y0") + (v - n("yMin")) / (n("yMax") - n("yMin")) * (n("y1") - n("y0"));
+  const isMajor = (v, min, maj) => Number.isFinite(maj) && maj > 0 && Math.abs((v - min) / maj - Math.round((v - min) / maj)) < 1e-6;
+  let minor = "", major = "";
+  for (let i = 0; i <= nx; i++) { const v = n("xMin") + i * n("xMinor"), d = `M${X(v).toFixed(2)} ${n("y1")}V${n("y0")}`; if (isMajor(v, n("xMin"), n("xMajor"))) major += d; else minor += d; }
+  for (let i = 0; i <= ny; i++) { const v = n("yMin") + i * n("yMinor"), d = `M${n("x0")} ${Y(v).toFixed(2)}H${n("x1")}`; if (isMajor(v, n("yMin"), n("yMajor"))) major += d; else minor += d; }
+  const grp = `<g data-grid="1" fill="none"><path d="${minor}" stroke="#bcd7e6" stroke-width="0.7"/><path d="${major}" stroke="#7fb0cb" stroke-width="1.2"/></g>`;
+  const m = /<svg[^>]*>/i.exec(svg); if (!m) return svg;
+  let at = m.index + m[0].length;
+  const r = /^\s*<rect[^>]*?(\/>|>\s*<\/rect>)/i.exec(svg.slice(at)); if (r) at += r[0].length;   // behind everything but the white page rect
+  return svg.slice(0, at) + grp + svg.slice(at);
+}
+const cleanFigs = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x.svg === "string" && /<svg[\s>]/i.test(x.svg)).map((x) => ({ part: String(x.part || ""), svg: withGrid(x.svg, x.grid) }));
+function valid(d) {
+  return d && Array.isArray(d.question) && d.question.length && Array.isArray(d.answer) && Array.isArray(d.solution)
+    ? { question: d.question.map(String), figure_svg: typeof d.figure_svg === "string" ? withGrid(d.figure_svg, d.figure_grid) : "", answer: d.answer.map(String), solution: d.solution.map(String), answer_figures: cleanFigs(d.answer_figures) } : null;
+}
+function busy(on, text) { $("busy").hidden = !on; if (text) $("busyText").textContent = text; }
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 3800); }
+$("stopBtn").onclick = () => ctl && ctl.abort();
+
+(async () => {
+  load(); initBankUI(); render();
+  try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
+  if (sample) { try { imgLimits = (await sample.limits()).images || null; } catch (e) { imgLimits = null; } }
+  if (!sample) {
+    $("bVar").disabled = true; $("goBtn").disabled = true;
+    $("inStatus").textContent = "Claude isn't available in this view. Open this page on claude.ai.";
+  }
+  if (!imgLimits) { $("dropText").textContent = "Images can't be sent from this view. Type the question on the left."; $("fileIn").disabled = true; }
+  render();
+})();
+
+/* ---------------- input view ---------------- */
+function openInput(on) { $("inputView").hidden = !on; $("teachView").hidden = on; $("dock").hidden = on; $("topRow").hidden = on; $("side").hidden = on; if (on) $("qInput").focus(); }
+$("newBtn").onclick = () => {
+  setTags("in", { book: B.f.root === "free" ? "FREE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, number: "" });
+  openInput(true);
+};
+$("backBtn").onclick = () => openInput(false);
+function addImages(files) {
+  if (!imgLimits) return;
+  for (const f of files) {
+    if (!/^image\//.test(f.type)) continue;
+    if (S.images.length >= (imgLimits.maxCount || 4)) { $("inStatus").textContent = `Up to ${imgLimits.maxCount} images.`; break; }
+    S.images.push(f);
+  }
+  drawThumbs();
+}
+function drawThumbs() {
+  const box = $("thumbs"); box.textContent = "";
+  S.images.forEach((f, i) => {
+    const fig = document.createElement("figure"); const img = document.createElement("img"); img.alt = "Question image " + (i + 1);
+    img.src = URL.createObjectURL(f); img.onload = () => URL.revokeObjectURL(img.src);
+    const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "Remove image");
+    x.onclick = (ev) => { ev.preventDefault(); S.images.splice(i, 1); drawThumbs(); };
+    fig.append(img, x); box.append(fig);
+  });
+}
+$("fileIn").onchange = (e) => { addImages(e.target.files); e.target.value = ""; };
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); addImages(e.dataTransfer.files); });
+document.addEventListener("paste", (e) => {
+  if ($("inputView").hidden) return;
+  const files = [...(e.clipboardData?.files || [])].filter((f) => /^image\//.test(f.type));
+  if (files.length) { e.preventDefault(); addImages(files); }
+});
+
+$("goBtn").onclick = async () => {
+  const text = $("qInput").value.trim();
+  if (!text && !S.images.length) { $("inStatus").className = "status err"; $("inStatus").textContent = "Type a question or add an image first."; return; }
+  $("inStatus").className = "status"; $("inStatus").textContent = "";
+  const prompt = `You are preparing a maths question for a teacher to project in class.
+${S.images.length ? "The attached image(s) show the question. Transcribe it exactly as written." : "Here is the question, typed by the teacher:"}
+${text ? "\nTeacher's text:\n" + text + "\n" : ""}
+Retype the question cleanly, redraw any diagram, and solve it.
+${FORMAT}
+Also add the key "category" with exactly one of "Concept", "Procedure", "Problem solving": what the question mainly tests (understanding an idea, carrying out a standard method, or planning a solution to an unfamiliar or multi-step problem).
+Also add the key "topic" with exactly one of ${TOPICS.map((t) => '"' + t + '"').join(", ")}: the area of mathematics the question belongs to.`;
+  ctl = new AbortController(); busy(true, "Claude is reading the question, redrawing the diagram and solving it… (about 30–60 seconds)");
+  try {
+    const raw = await sample.json(prompt, { signal: ctl.signal, modelTier: "complex", images: S.images.length ? S.images : undefined });
+    const d = valid(raw);
+    if (!d) throw { code: "invalid_json" };
+    const tags = readTags("in");
+    if (!tags.category && CATS.includes(raw.category)) tags.category = raw.category;
+    if (tags.book === "FREE" && !tags.topic && TOPICS.includes(raw.topic)) tags.topic = raw.topic;
+    S.images = []; drawThumbs(); $("qInput").value = "";
+    await addToBank({ ...tags, ...d });
+    openInput(false);
+  } catch (e) {
+    $("inStatus").className = e.code === "cancelled" ? "status" : "status err"; $("inStatus").textContent = codeMsg(e);
+  } finally { busy(false); }
+};
+
+/* ---------------- teaching buttons ---------------- */
+
+/* ---------------- question bank: db store, filter row, tags ---------------- */
+// filters that do not depend on where the question sits in the book
+function nonLoc(d) {
+  const f = B.f, q = f.q.trim().toLowerCase();
+  return (!f.type || d.type === f.type) && (!f.cat || d.category === f.cat) &&
+    (!q || qName(d).toLowerCase().includes(q) || String(d.number || "").toLowerCase().includes(q) || (d.question || []).join(" ").toLowerCase().includes(q) || String(d.section || "").startsWith(q));
+}
+function matches(d) {
+  const f = B.f;
+  return nonLoc(d) && (!f.root || (f.root === "free") === isFree(d)) && (!f.topic || d.topic === f.topic) &&
+    (!f.vol || d.volume === f.vol) && (!f.chap || String(d.chapter) === f.chap) && (!f.sec || d.section === f.sec);
+}
+const stuVar = {};
+function showIndex(i) {
+  const d = B.list[i] || null;
+  const same = d && S.orig && S.orig.id === d.id;
+  B.idx = d ? i : -1;
+  // the variants a question has made are stored with it, so they are there again next time
+  if (!canWrite && S.orig && S.orig.id && !same) stuVar[S.orig.id] = S.variants; // a reader's own variants stay for this visit only
+  if (same) { S.orig = d; if (Array.isArray(d.variants)) S.variants = d.variants.slice(-MAXV); }
+  else { S.orig = d; S.variants = d && !canWrite && stuVar[d.id] ? stuVar[d.id] : d && Array.isArray(d.variants) ? d.variants.slice(-MAXV) : []; S.vi = -1; S.answer = false; }
+  if (!d && !B.all.length && !db) S.orig = EXAMPLE;
+  save(); render();
+}
+function applyFilters(keepId) {
+  B.all.sort(cmpQ);
+  if (!B.all.length) { B.list = []; B.idx = -1; S.orig = B.loaded || !db ? EXAMPLE : null; if (!S.orig) { S.variants = []; S.vi = -1; } save(); render(); return; }
+  B.list = B.all.filter(matches);
+  let i = keepId ? B.list.findIndex((d) => d.id === keepId) : -1;
+  if (i < 0) i = B.list.length ? 0 : -1;
+  showIndex(i);
+}
+function readFilters() { B.f = { ...B.f, book: "", type: $("fType").value, cat: $("fCat").value, q: $("fSearch").value }; }
+function initBankUI() {
+  fill($("fType"), TYPES, "All"); fill($("fCat"), CATS, "All");
+  initFilterValues(); readFilters();
+  for (const id of ["fType", "fCat"]) $(id).addEventListener("change", () => { readFilters(); applyFilters(null); });
+  let t; $("fSearch").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { readFilters(); applyFilters(null); }, 250); });
+  let sideOpen = true; try { sideOpen = localStorage.getItem("tb_side") !== "0"; } catch (e) {}
+  setSide(sideOpen && !matchMedia("(max-width: 900px)").matches);
+  $("sideBtn").onclick = () => setSide($("side").classList.contains("closed"));
+  $("prevQ").onclick = () => { if (B.idx > 0) showIndex(B.idx - 1); };
+  $("nextQ").onclick = () => { if (B.idx < B.list.length - 1) showIndex(B.idx + 1); };
+  tagGrid($("inTagGrid"), "in"); tagGrid($("edTagGrid"), "ed");
+}
+async function addToBank(rec) {
+  rec = { ...rec, createdAt: Date.now() };
+  if (db && canWrite) {
+    try {
+      const ref = await db.collection("bank").add(rec);
+      // make sure the new question is visible under the current filters
+      if (!matches(rec)) { B.f = { ...B.f, ...locOf(rec), type: "", cat: "", q: "" }; initFilterValues(); }
+      B.lastId = ref.id;
+      const local = { id: ref.id, ...rec };
+      if (!B.all.some((d) => d.id === ref.id)) B.all.push(local);
+      applyFilters(ref.id);
+      toast("Question saved to the bank");
+      return;
+    } catch (e) { toast(e && e.code === "quota_exceeded" ? "The question bank is full. Delete some questions first." : "Couldn't save to the bank. The question is shown but not saved."); }
+  } else toast("The question bank isn't available here, so this question is shown but not saved.");
+  S.orig = rec; S.variants = []; S.vi = -1; S.answer = false; render();
+}
+function initFilterValues() { $("fType").value = B.f.type || ""; $("fCat").value = B.f.cat || ""; $("fSearch").value = B.f.q || ""; }
+
+/* edit a saved question: tags, wording, answer, solution */
+const toLines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+let pvT = null;
+function editPreview() { renderLines($("edPrevQ"), toLines($("edQ").value)); renderLines($("edPrevA"), toLines($("edA").value)); }
+for (const id of ["edQ", "edA"]) $(id).addEventListener("input", () => { clearTimeout(pvT); pvT = setTimeout(editPreview, 400); });
+$("tagBtn").onclick = () => {
+  const o = S.orig; if (!o || !o.id) return;
+  setTags("ed", o);
+  $("edQ").value = (o.question || []).join("\n"); $("edA").value = (o.answer || []).join("\n"); $("edS").value = (o.solution || []).join("\n");
+  $("edFigWrap").hidden = $("edRedraw").hidden = !o.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(o.figure_svg);
+  $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagStatus").textContent = "";
+  $("tagModal").hidden = false; editPreview(); $("edQ").focus();
+};
+$("tagCancel").onclick = () => { $("tagModal").hidden = true; };
+// redraw the question's own diagram, e.g. to put a graph on grid paper
+let edFigNew = null, edFigUrl = null;
+function paintEdFig(svg) {
+  if (edFigUrl) { URL.revokeObjectURL(edFigUrl); edFigUrl = null; }
+  const box = $("edFigPrev"); box.textContent = "";
+  const s = cleanSvg(svg); if (!s) return;
+  edFigUrl = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" }));
+  const fig = document.createElement("figure"); const img = document.createElement("img"); img.src = edFigUrl; img.alt = "Diagram preview"; fig.append(img); box.append(fig);
+}
+$("edRedraw").onclick = async () => {
+  const o = S.orig; if (!o || !o.id || !sample) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "Claude isn't available here, so the diagram can't be redrawn."; return; }
+  const cur = edFigNew || o.figure_svg;
+  const prompt = `Redraw this diagram from a maths question, keeping exactly the same content: the same shapes or data, the same numbers, labels and scale. Only improve how it is drawn.
+Question:
+${toLines($("edQ").value).join("\n")}
+
+Current diagram (SVG):
+${cur}
+
+Reply with ONLY one JSON object, no other text: {"figure_svg": "<svg ...>", "figure_grid": object or null}
+The svg is a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels in font-family "Times New Roman, serif" font-size 18. No scripts, no images, no external references. ${GRID}
+Read every bar height, point and label from the current diagram and the question carefully, and keep them unchanged.`;
+  ctl = new AbortController();
+  const btn = $("edRedraw"), label = btn.textContent, t0 = Date.now(); btn.disabled = true; $("tagSave").disabled = true;
+  const tick = () => { $("tagStatus").className = "status"; $("tagStatus").textContent = "⏳ Claude is redrawing the diagram… " + Math.round((Date.now() - t0) / 1000) + " s. Please wait; don't press the button again. This usually takes 20–60 seconds."; btn.textContent = "Redrawing… please wait"; };
+  tick(); const tm = setInterval(tick, 1000);
+  try {
+    const r = await sample.json(prompt, { signal: ctl.signal, modelTier: "complex", cache: false });
+    if (typeof r.figure_svg !== "string" || !/<svg[\s>]/i.test(r.figure_svg)) throw { code: "invalid_json" };
+    edFigNew = withGrid(r.figure_svg, r.figure_grid); $("edFig").checked = true; paintEdFig(edFigNew);
+    clearInterval(tm);
+    if (edFigNew === r.figure_svg && /axis|histogram|graph/i.test(toLines($("edQ").value).join(" "))) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "✗ Done, but this drawing has no grid (Claude didn't describe the plotting area). It is NOT the one to keep: press Redraw once more and wait."; return; }
+    $("tagStatus").className = "status"; $("tagStatus").textContent = "✓ New diagram ready" + (/data-grid=/.test(edFigNew) ? " (with grid)" : "") + ". Compare it with the original, then press Save changes.";
+  } catch (e) { clearInterval(tm); if (e.code !== "cancelled") { $("tagStatus").className = "status err"; $("tagStatus").textContent = "✗ " + codeMsg(e) + " Press Redraw to try again."; } else $("tagStatus").textContent = ""; }
+  finally { clearInterval(tm); btn.disabled = false; btn.textContent = label; $("tagSave").disabled = false; busy(false); }
+};
+// Delete in the sidebar: press once to arm, press again within 4 s to delete for good
+let delArm = null;
+const disarmDel = () => { clearTimeout(delArm); delArm = null; $("delBtn").textContent = "Delete"; };
+$("delBtn").onclick = async () => {
+  const o = S.orig; if (!o || !o.id || !db) return;
+  if (!delArm) { $("delBtn").textContent = "Press again"; delArm = setTimeout(disarmDel, 4000); return; }
+  disarmDel();
+  try { await db.doc("bank/" + o.id).delete(); B.all = B.all.filter((d) => d.id !== o.id); applyFilters(null); toast("Question deleted"); }
+  catch (e) { toast("Couldn't delete the question. Try again."); }
+};
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("tagModal").hidden) $("tagModal").hidden = true; });
+async function persistEdit(id, rec, msg) {
+  $("tagSave").disabled = true;
+  try { await db.doc("bank/" + id).update({ ...rec, updatedAt: Date.now() }); $("tagModal").hidden = true; $("edReview").hidden = true; toast(msg || "Question updated"); }
+  catch (e) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "Couldn't save the changes. Try again."; }
+  finally { $("tagSave").disabled = false; }
+}
+let pendingEdit = null;
+$("tagSave").onclick = async () => {
+  const o = S.orig, id = o && o.id; if (!id) return;
+  $("tagStatus").className = "status"; $("tagStatus").textContent = ""; $("edReview").hidden = true;
+  const question = toLines($("edQ").value);
+  if (!question.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question can't be empty."; return; }
+  const rec = { ...readTags("ed"), question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
+  // only a change to the wording of the question (or its diagram) can make the answer and solution wrong; tags and typos in the answer cannot be judged here
+  const same = (a, b) => JSON.stringify((a || []).map((x) => String(x).trim())) === JSON.stringify((b || []).map((x) => String(x).trim()));
+  // a diagram only redrawn in a new style (same content) does not call the answer into question
+  const changed = !same(question, o.question) || (!edFigNew && rec.figure_svg !== (o.figure_svg || ""));
+  if (!changed || !$("edCheck").checked || !sample) { await persistEdit(id, rec, changed && !sample ? "Saved. The answer wasn't re-checked because Claude isn't available here." : "Question updated"); return; }
+  const prompt = `A teacher edited a maths question. Decide whether the stored answer and worked solution still fit the EDITED question.
+Edited question (one paragraph or part per line):
+${question.join("\n")}
+${rec.figure_svg ? "\nThe diagram currently stored with it (SVG):\n" + rec.figure_svg + "\n" : ""}
+Stored answer:
+${rec.answer.join("\n")}
+
+Stored solution:
+${rec.solution.join("\n")}
+
+Solve the EDITED question yourself from scratch, then compare with the stored answer and solution. Treat a changed number, quantity, condition or sub-question as a real change; ignore differences that are only wording, spacing or LaTeX style.
+Reply with ONLY one JSON object, no other text:
+{"matches": true or false, "reason": "one short sentence saying what differs, or that everything still fits", "answer": [string, ...], "solution": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
+- "answer_figures": the drawings that belong to the correct answer of the EDITED question (histogram, graph, number line, net … that the question asks for), drawn accurately from its data as ${SVG_RULES} "part" is the part's label as in "answer", or "". Use [] if the answer needs no drawing.
+- "answer" and "solution": the correct answer and worked solution for the edited question. If "matches" is true, repeat the stored ones unchanged. One string per part (answer) or per short step (solution), each part starting with its label such as "(a)". Write every mathematical expression in LaTeX between single dollar signs; a literal money sign is \\\\$.
+- "figure_svg": "" if the diagram does not need to change. If the numbers or labels in the question no longer agree with the diagram, the full corrected diagram as one standalone SVG (same drawing rules as the stored one: white background, black strokes, dashed hidden edges, labels beside the right points or sides, no scripts).`;
+  ctl = new AbortController(); busy(true, "Claude is checking the answer and solution against your edit…");
+  try {
+    const r = await sample.json(prompt, { signal: ctl.signal, modelTier: "default", cache: false });
+    const na = (r.answer || []).map(String), ns = (r.solution || []).map(String);
+    // a diagram the teacher just redrew (with its grid) or one that already has a grid is never replaced by the checker's gridless copy
+    const keepFig = !!edFigNew || /data-grid=/.test(rec.figure_svg || "");
+    const diag = !keepFig && typeof r.figure_svg === "string" && /<svg[\s>]/i.test(r.figure_svg) ? withGrid(r.figure_svg, r.figure_grid) : "";
+    if (r.matches === true && !diag) { await persistEdit(id, rec, "Question updated. The answer and solution still match."); return; }
+    if (!na.length || !ns.length) throw { code: "invalid_json" };
+    pendingEdit = { id, rec, answer: na, solution: ns, figure_svg: diag, answer_figures: cleanFigs(r.answer_figures) };
+    $("edRevHead").textContent = "The edit changes the question, so the answer and solution may be out of date. " + (r.reason ? String(r.reason) : "");
+    renderLines($("edRevOld"), [...rec.answer, ...dedupe(rec.solution)]);
+    renderLines($("edRevNew"), [...na, ...dedupe(ns)]);
+    $("revUse").textContent = diag ? "Use the suggested answer, solution and diagram" : "Use the suggested answer and solution";
+    $("edReview").hidden = false; $("edReview").scrollIntoView({ block: "nearest" });
+  } catch (e) {
+    if (e && e.code === "cancelled") return;
+    $("tagStatus").className = "status err"; $("tagStatus").textContent = codeMsg(e) + " Nothing was saved. Press Save changes to try again, or untick the check box to save without it.";
+  } finally { busy(false); }
+};
+$("revUse").onclick = () => { const p = pendingEdit; if (p) persistEdit(p.id, { ...p.rec, answer: p.answer, solution: p.solution, figure_svg: p.rec.figure_svg && /data-grid=/.test(p.rec.figure_svg) ? p.rec.figure_svg : (p.figure_svg || p.rec.figure_svg), answer_figures: p.answer_figures, figs_checked: p.answer_figures.length > 0 },"Question, answer and solution updated"); };
+$("revKeep").onclick = () => { const p = pendingEdit; if (p) persistEdit(p.id, p.rec, "Question updated. The old answer and solution were kept."); };
+$("revBack").onclick = () => { $("edReview").hidden = true; $("edQ").focus(); };
+$("tagDel").onclick = async () => {
+  const id = S.orig && S.orig.id; if (!id) return;
+  if (!$("tagDel").dataset.armed) { $("tagDel").dataset.armed = "1"; $("tagDel").textContent = "Press again to delete for good"; return; }
+  try { await db.doc("bank/" + id).delete(); B.all = B.all.filter((d) => d.id !== id); $("tagModal").hidden = true; applyFilters(null); toast("Question deleted"); }
+  catch (e) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "Couldn't delete the question. Try again."; }
+};
+// the read-only Reader site has no database: it shows the bank saved in data/bank.json
+async function loadStatic() {
+  try { const r = await fetch("data/bank.json", { cache: "no-cache" }); const j = await r.json(); B.all = Array.isArray(j.questions) ? j.questions : []; }
+  catch (e) { B.all = []; toast("The questions could not be loaded. Reload the page."); }
+  B.loaded = true; canWrite = false; applyFilters(B.lastId);
+}
+(async () => {
+  try { db = await window.claude?.use?.("db"); } catch (e) { db = null; }
+  if (!db && window.READER) { await loadStatic(); return; }
+  if (!db) { B.loaded = true; applyFilters(null); return; }
+  try { const user = await window.claude?.use?.("user"); const w = user ? await user.can("data.write") : null; canWrite = w !== false; } catch (e) { canWrite = true; }
+  render();
+  const slow = setTimeout(() => { if (!B.loaded) toast("The question bank can't be reached yet."); }, 10000);
+  db.collection("bank").orderBy("createdAt").limit(1000).onSnapshot((snap) => {
+    if (!snap.metadata.fromCache) { clearTimeout(slow); B.loaded = true; }
+    B.all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    applyFilters((S.orig && S.orig.id) || B.lastId);
+  }, () => { clearTimeout(slow); B.loaded = true; applyFilters(null); toast("The question bank stopped responding. Reload the page to reconnect."); });
+})();
+function variantPrompt(base, existing) {
+  const seen = existing.map((v) => v.question.join(" ")).join("\n---\n");
+  return `Here is a maths question with its diagram, answer and solution, as JSON:
+${JSON.stringify({ question: base.question, figure_svg: base.figure_svg, answer: base.answer, solution: base.solution })}
+
+Write ONE new variant of this question. Change ONLY the numbers (lengths, quantities, coefficients, data values). Keep the context, wording, structure, sub-questions and units the same, so the same method solves it. Choose numbers that are realistic and give tidy answers of similar difficulty (avoid ugly decimals unless the original has them). If there is a diagram, return the same diagram with the new numbers in the labels (keep its geometry valid). Recompute the answer and the full solution from scratch and check them.
+${seen ? "Use numbers different from these earlier variants:\n" + seen + "\n" : ""}Variety key: ${Math.random().toString(36).slice(2, 8)}
+${FORMAT}`;
+}
+$("bVar").onclick = async () => {
+  if (!sample || !S.orig) return;
+  const base = S.orig;
+  const full = S.variants.length >= MAXV;
+  if (full) toast("You can keep 3 variants. Variant 1 will be deleted, and Variants 2 and 3 become 1 and 2.");
+  const prompt = variantPrompt(base, S.variants);
+  ctl = new AbortController(); busy(true, full ? "Claude is writing a new variant… Variant 1 is deleted once it is ready." : "Claude is writing a variant…");
+  try {
+    const d = valid(await sample.json(prompt, { signal: ctl.signal, modelTier: "default", cache: false }));
+    if (!d) throw { code: "invalid_json" };
+    const keep = [...S.variants, d].slice(-MAXV);
+    S.variants = keep; S.vi = keep.length - 1; S.answer = false; render();
+    // keep them with the question so they can be opened again later
+    if (base.id && db && canWrite) {
+      try { await db.doc("bank/" + base.id).update({ variants: keep }); }
+      catch (e) { toast("The variant is on screen but couldn't be saved with the question."); }
+    }
+  } catch (e) { if (e.code !== "cancelled") toast(codeMsg(e)); }
+  finally { busy(false); }
+};
+
+/* ---------------- .docx export (Word equations, convertible to MathType) ---------------- */
+const X = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// MathML (from MathJax) -> OMML
+function mmlToOmml(node) {
+  const kids = (el) => [...el.children].map(conv).join("");
+  const ch = (el, i) => el.children[i] ? conv(el.children[i]) : "";
+  const r = (t, sty) => t === "" ? "" : `<m:r>${sty ? `<m:rPr>${sty}</m:rPr>` : ""}<m:t xml:space="preserve">${X(t)}</m:t></m:r>`;
+  const P = '<m:sty m:val="p"/>';
+  function conv(el) {
+    const n = el.localName, t = el.textContent;
+    switch (n) {
+      case "mi": return r(t, (t.length > 1 || el.getAttribute("mathvariant") === "normal") ? P : "");
+      case "mn": return r(t, P);
+      case "mo": return /^[⁡-⁤]$/.test(t) ? "" : r(t, P);
+      case "mtext": case "ms": return r(t, "<m:nor/>");
+      case "mspace": case "mphantom": case "none": case "mprescripts": return "";
+      case "mfrac": return `<m:f>${el.getAttribute("linethickness") === "0" ? '<m:fPr><m:type m:val="noBar"/></m:fPr>' : ""}<m:num>${ch(el, 0)}</m:num><m:den>${ch(el, 1)}</m:den></m:f>`;
+      case "msup": return `<m:sSup><m:e>${ch(el, 0)}</m:e><m:sup>${ch(el, 1)}</m:sup></m:sSup>`;
+      case "msub": return `<m:sSub><m:e>${ch(el, 0)}</m:e><m:sub>${ch(el, 1)}</m:sub></m:sSub>`;
+      case "msubsup": return `<m:sSubSup><m:e>${ch(el, 0)}</m:e><m:sub>${ch(el, 1)}</m:sub><m:sup>${ch(el, 2)}</m:sup></m:sSubSup>`;
+      case "msqrt": return `<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/><m:e>${kids(el)}</m:e></m:rad>`;
+      case "mroot": return `<m:rad><m:deg>${ch(el, 1)}</m:deg><m:e>${ch(el, 0)}</m:e></m:rad>`;
+      case "mover": {
+        const o = (el.children[1]?.textContent || "").trim();
+        if (/^[¯‾_]$/.test(o)) return `<m:bar><m:barPr><m:pos m:val="top"/></m:barPr><m:e>${ch(el, 0)}</m:e></m:bar>`;
+        if (el.getAttribute("accent") === "true" || /^[˙ˆ^˜~→⃗´`ˇ˘¨]$/.test(o))
+          return `<m:acc><m:accPr><m:chr m:val="${X(o === "˙" ? "̇" : o)}"/></m:accPr><m:e>${ch(el, 0)}</m:e></m:acc>`;
+        return `<m:limUpp><m:e>${ch(el, 0)}</m:e><m:lim>${ch(el, 1)}</m:lim></m:limUpp>`;
+      }
+      case "munder": return `<m:limLow><m:e>${ch(el, 0)}</m:e><m:lim>${ch(el, 1)}</m:lim></m:limLow>`;
+      case "munderover": return `<m:limUpp><m:e><m:limLow><m:e>${ch(el, 0)}</m:e><m:lim>${ch(el, 1)}</m:lim></m:limLow></m:e><m:lim>${ch(el, 2)}</m:lim></m:limUpp>`;
+      case "mtable": return `<m:m>${[...el.children].map((tr) => `<m:mr>${[...tr.children].map((td) => `<m:e>${kids(td)}</m:e>`).join("")}</m:mr>`).join("")}</m:m>`;
+      case "semantics": return el.children[0] ? conv(el.children[0]) : "";
+      case "mrow": case "mstyle": case "mpadded": case "menclose": case "math": default: {
+        const c = [...el.children];
+        const f = c[0], l = c[c.length - 1];
+        const open = (e) => e && e.localName === "mo" && (e.getAttribute("data-mjx-texclass") === "OPEN" || e.getAttribute("fence") === "true");
+        const close = (e) => e && e.localName === "mo" && (e.getAttribute("data-mjx-texclass") === "CLOSE" || e.getAttribute("fence") === "true");
+        if (n === "mrow" && c.length >= 2 && open(f) && close(l)) {
+          const inner = c.slice(1, -1).map(conv).join("");
+          return `<m:d><m:dPr><m:begChr m:val="${X(f.textContent)}"/><m:endChr m:val="${X(l.textContent)}"/></m:dPr><m:e>${inner}</m:e></m:d>`;
+        }
+        return c.map(conv).join("");
+      }
+    }
+  }
+  return conv(node);
+}
+function texToOmml(tex) {
+  try {
+    const mml = MathJax.tex2mml(tex);
+    const doc = new DOMParser().parseFromString(mml, "application/xml");
+    if (doc.querySelector("parsererror")) throw 0;
+    return `<m:oMath>${mmlToOmml(doc.documentElement)}</m:oMath>`;
+  } catch (e) { return `<w:r><w:t xml:space="preserve">${X(tex)}</w:t></w:r>`; }
+}
+const RPR = (b, sz) => `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="新細明體" w:cs="Times New Roman"/>${b ? "<w:b/>" : ""}${sz ? `<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>` : ""}</w:rPr>`;
+const tRun = (t, b, sz) => t ? `<w:r>${RPR(b, sz)}<w:t xml:space="preserve">${X(t)}</w:t></w:r>` : "";
+function lineXml(raw, opt = {}) {
+  const cont = raw.charCodeAt(0) === 2;
+  const [lbl, rest] = cont ? [null, raw.slice(1)] : labelOf(raw);
+  const sub = lbl && /^\((i|ii|iii|iv|v|vi)\)$/.test(lbl);
+  const ind = lbl ? `<w:ind w:left="${sub ? 1080 : 540}" w:hanging="540"/>` : (cont ? '<w:ind w:left="540"/>' : "");
+  let body = lbl ? tRun(lbl + " ", true) : "";
+  for (const sg of segments(rest)) body += sg.k === "t" ? tRun(sg.v) : texToOmml(sg.v);
+  return `<w:p><w:pPr><w:spacing w:after="80" w:line="320" w:lineRule="auto"/>${ind}</w:pPr>${body}</w:p>`;
+}
+const heading = (t) => `<w:p><w:pPr><w:spacing w:before="240" w:after="100"/></w:pPr>${tRun(t, true, 28)}</w:p>`;
+function imageXml(w, h, n) {
+  const maxW = 4.6 * 914400, cx = Math.round(Math.min(maxW, w * 9525 * 1.3)), cy = Math.round(cx * h / w);
+  const A = "http://schemas.openxmlformats.org/drawingml/2006/main", PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  return `<w:p><w:pPr><w:spacing w:before="120" w:after="120"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Figure ${n}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="${A}" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}"><pic:pic xmlns:pic="${PIC}"><pic:nvPicPr><pic:cNvPr id="${n}" name="figure${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+async function buildDocx(q, title) {
+  await mjReady();
+  const imgs = [];   // every picture in the file, numbered from 1
+  const add = async (svg) => { const p = await svgToPng(svg); if (!p) return 0; imgs.push(p); return imgs.length; };
+  const qn = await add(q.figure_svg);
+  let body = `<w:p><w:pPr><w:spacing w:after="160"/></w:pPr>${tRun(title, true, 32)}</w:p>`;
+  body += heading("Question") + q.question.map((l) => lineXml(l)).join("");
+  if (qn) body += imageXml(imgs[qn - 1].w, imgs[qn - 1].h, qn);
+  body += heading("Answer") + q.answer.map((l) => lineXml(l)).join("");
+  for (const f of q.answer_figures || []) {
+    const n = await add(f.svg);
+    if (n) body += (f.part ? lineXml(f.part) : "") + imageXml(imgs[n - 1].w, imgs[n - 1].h, n);
+  }
+  body += heading("Solution") + dedupe(q.solution).map((l) => lineXml(l)).join("");
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>${imgs.map((_, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/figure${i + 1}.png"/>`).join("")}</Relationships>`);
+  zip.file("word/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="新細明體" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="en-GB" w:eastAsia="zh-TW"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`);
+  zip.file("word/settings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:mathPr><m:mathFont m:val="Cambria Math"/><m:dispDef/><m:lMargin m:val="0"/><m:rMargin m:val="0"/><m:defJc m:val="left"/><m:wrapIndent m:val="1440"/><m:intLim m:val="subSup"/><m:naryLim m:val="undOvr"/></m:mathPr><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`);
+  zip.file("word/document.xml", doc);
+  imgs.forEach((p, i) => zip.file(`word/media/figure${i + 1}.png`, p.blob));
+  return zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+function stamp() { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+async function exportDoc() {
+  const q = cur();
+  if (!q) return;
+  const name = S.vi < 0 ? "Original" : `Variant ${S.vi + 1}`;
+  busy(true, "Creating the Word file…"); $("stopBtn").hidden = true;
+  try {
+    const blob = await buildDocx(q, name);
+    const dl = await window.claude?.use?.("downloads");
+    if (!dl) { toast("Files can't be downloaded in this view. Open this page on claude.ai."); return; }
+    busy(false);
+    await dl.save({ filename: `${name.replace(" ", "")}_${stamp()}.docx`, data: blob });
+    toast("Downloaded " + name + ".docx");
+  } catch (e) {
+    if (e && e.code === "declined") return;
+    toast(e && e.code === "unavailable" ? "Files can't be downloaded in this view." : "Couldn't create the Word file. Try again.");
+  } finally { busy(false); $("stopBtn").hidden = false; }
+}
+$("bExp").onclick = () => exportDoc();
+
+/* ---------------- studio only: batch variants and sync to the Reader site ---------------- */
+function refreshAdmin() {
+  $("adminRow").hidden = !(db && canWrite);
+  const left = B.all.filter((d) => (d.variants || []).length < MAXV).length;
+  $("batchBtn").textContent = left ? `Make 3 variants for every question (${left} left)` : "All questions have 3 variants";
+  $("batchBtn").disabled = !left || !sample || batchRun;
+}
+var batchRun = false;
+$("batchBtn").onclick = async () => {
+  if (batchRun || !sample || !canWrite) return;
+  const queue = B.all.filter((d) => d.id && (d.variants || []).length < MAXV);
+  if (!queue.length) return;
+  batchRun = true; ctl = new AbortController(); const signal = ctl.signal;
+  let done = 0, fail = 0; const total = queue.length;
+  const show = () => busy(true, `Making variants… ${done} of ${total} questions done${fail ? ", " + fail + " problems" : ""}. This takes a while. Press Stop to pause; press the button again to continue where it stopped.`);
+  show();
+  const worker = async () => {
+    while (queue.length && !signal.aborted) {
+      const d = queue.shift();
+      let vs = (d.variants || []).slice(0, MAXV);
+      try {
+        while (vs.length < MAXV && !signal.aborted) {
+          const v = valid(await sample.json(variantPrompt(d, vs), { signal, modelTier: "default", cache: false }));
+          if (!v) throw { code: "invalid_json" };
+          vs = [...vs, v];
+          await db.doc("bank/" + d.id).update({ variants: vs });
+          d.variants = vs;
+        }
+        if (vs.length >= MAXV) done++;
+      } catch (e) { if (e && e.code === "cancelled") break; fail++; }
+      show();
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  batchRun = false; busy(false); ctl = null; applyFilters((S.orig && S.orig.id) || null);
+  toast(signal.aborted ? "Paused. Press the button again to continue." : fail ? `Finished, but ${fail} question(s) need another try: press the button again.` : "Every question now has 3 variants.");
+};
+// Sync: save the whole bank as bank.json; the sync script (or Claude Code) then publishes it to the Reader site
+$("syncBtn").onclick = async () => {
+  if (!db) return;
+  try {
+    const dl = await window.claude?.use?.("downloads");
+    if (!dl) { toast("Files can't be downloaded in this view. Open this page on claude.ai."); return; }
+    const questions = B.all.map((d) => ({ ...d }));
+    const blob = new Blob([JSON.stringify({ app: "imitate-and-practice", savedAt: new Date().toISOString(), count: questions.length, questions })], { type: "application/json" });
+    await dl.save({ filename: "bank.json", data: blob });
+    toast(`Saved bank.json (${questions.length} questions). Now run “Sync Reader.bat”, or tell Claude Code: sync the Reader site.`);
+  } catch (e) { if (e && e.code === "declined") return; toast("Couldn't save bank.json. Try again."); }
+};
+
+</script>
+
+</html>
