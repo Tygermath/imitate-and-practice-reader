@@ -263,9 +263,10 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
     <section class="sgroup" role="search" aria-label="Filters">
       <label class="field"><span>SEARCH</span><input id="fSearch" type="search" placeholder="Number or text"></label>
       <div class="row" style="gap:8px; flex-wrap:nowrap">
-        <label class="field"><span>TYPE</span><select id="fType"></select></label>
-        <label class="field"><span>CATEGORY</span><select id="fCat"></select></label>
+        <label class="field"><span>SCENARIO</span><select id="fType"></select></label>
+        <label class="field"><span>COMPETENCY</span><select id="fCat"></select></label>
       </div>
+      <label class="field"><span>LEVEL</span><select id="fDiff"></select></label>
     </section>
     <section class="sgroup" aria-labelledby="treeHead">
       <h2 id="treeHead">New Discovering Mathematics</h2>
@@ -406,7 +407,7 @@ const EXAMPLE = {
 /* ---------------- state ---------------- */
 const S = { orig: EXAMPLE, variants: [], showing: "orig", answerFor: null, images: [] };
 // question bank: B.all = every stored question, B.list = those matching the filter row
-const B = { all: [], list: [], idx: -1, loaded: false, lastId: null, f: { book: "", root: "", topic: "", vol: "", chap: "", sec: "", type: "", cat: "", q: "" } };
+const B = { all: [], list: [], idx: -1, loaded: false, lastId: null, f: { book: "", root: "", topic: "", vol: "", chap: "", sec: "", type: "", cat: "", diff: "", q: "" } };
 function save() { try { localStorage.setItem("tb_prefs", JSON.stringify({ f: B.f, lastId: S.orig && S.orig.id || B.lastId })); } catch (e) {} }
 function load() { try { const d = JSON.parse(localStorage.getItem("tb_prefs") || "null"); if (d && d.f) { B.f = { ...B.f, ...d.f }; B.lastId = d.lastId || null; } } catch (e) {} }
 // S.vi: which one is on screen, -1 = the original, 0..2 = Variant 1..3. S.answer: the answer card is open.
@@ -423,8 +424,9 @@ const BOOKS = [["NDM", "New Discovering Mathematics"], ["FREE", "Not tied to a t
 // questions that do not come from a textbook are filed by area of mathematics
 const TOPICS = ["Numbers / Algebra", "Shapes / Geometry", "Changes / Precalculus", "Data and Uncertainty / Probability and Statistics"];
 const isFree = (d) => d && d.book === "FREE";
-const TYPES = ["Worked example", "Exercise"];
+const TYPES = ["Worked example", "Exercise", "Discussion", "Quiz"];
 const CATS = ["Concept", "Procedure", "Problem solving"];
+const DIFFS = ["Basic", "Intermediate", "Advanced"];
 function fill(sel, items, first) {
   const v = sel.value; sel.textContent = "";
   if (first !== null) sel.add(new Option(first, ""));
@@ -442,7 +444,7 @@ function cascade(p, first) {
 }
 function setupSelects(p, first) {
   fill($(p + "Book"), BOOKS, first); fill($(p + "Vol"), volItems(), first);
-  fill($(p + "Type"), TYPES, first); fill($(p + "Cat"), CATS, first);
+  fill($(p + "Type"), TYPES, first); fill($(p + "Cat"), CATS, first); fill($(p + "Diff"), DIFFS, first);
   fill($(p + "Topic"), TOPICS, first);
   $(p + "Vol").addEventListener("change", () => { $(p + "Chap").value = ""; $(p + "Sec").value = ""; cascade(p, first); });
   $(p + "Chap").addEventListener("change", () => { $(p + "Sec").value = ""; cascade(p, first); });
@@ -461,22 +463,23 @@ function tagGrid(el, p) {
   <label class="field"><span>VOLUME</span><select id="${p}Vol"></select></label>
   <label class="field"><span>CHAPTER</span><select id="${p}Chap"></select></label>
   <label class="field wide"><span>SECTION</span><select id="${p}Sec"></select></label>
-  <label class="field"><span>TYPE</span><select id="${p}Type"></select></label>
-  <label class="field"><span>CATEGORY</span><select id="${p}Cat"></select></label>
-  <label class="field"><span>NUMBER</span><input id="${p}Num" placeholder="e.g. 4 or 3a"></label>`;
+  <label class="field"><span>SCENARIO</span><select id="${p}Type"></select></label>
+  <label class="field"><span>COMPETENCY</span><select id="${p}Cat"></select></label>
+  <label class="field"><span>LEVEL</span><select id="${p}Diff"></select></label>
+  <label class="field"><span>NUMBER</span><input id="${p}Num" placeholder="1, 2, 3, ..."></label>`;
   setupSelects(p, "—");
 }
 function setTags(p, t) {
   $(p + "Book").value = t.book || "NDM"; $(p + "Vol").value = t.volume || ""; cascade(p, "—");
   $(p + "Chap").value = t.chapter ? String(t.chapter) : ""; cascade(p, "—");
   $(p + "Sec").value = t.section || ""; $(p + "Topic").value = t.topic || ""; syncBook(p);
-  $(p + "Type").value = t.type || ""; $(p + "Cat").value = t.category || ""; $(p + "Num").value = t.number || "";
+  $(p + "Type").value = t.type || ""; $(p + "Cat").value = t.category || ""; $(p + "Diff").value = t.difficulty || ""; $(p + "Num").value = t.number || "";
 }
 function readTags(p) {
   const free = $(p + "Book").value === "FREE";
   return { book: $(p + "Book").value, topic: free ? $(p + "Topic").value : "",
     volume: free ? "" : $(p + "Vol").value, chapter: !free && $(p + "Chap").value ? Number($(p + "Chap").value) : "",
-    section: free ? "" : $(p + "Sec").value, type: $(p + "Type").value, category: $(p + "Cat").value, number: $(p + "Num").value.trim() };
+    section: free ? "" : $(p + "Sec").value, type: $(p + "Type").value, category: $(p + "Cat").value, difficulty: $(p + "Diff").value, number: $(p + "Num").value.trim() };
 }
 // where a question sits in the tree, as filter values
 const locOf = (d) => isFree(d) ? { root: "free", topic: d.topic || "", vol: "", chap: "", sec: "" }
@@ -496,10 +499,10 @@ function setLoc(v, c, s) { B.f.root = v ? "ndm" : ""; B.f.topic = ""; B.f.vol = 
 function setRoot(r) { B.f.root = r; B.f.topic = ""; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
 function setTopic(t) { B.f.root = "free"; B.f.topic = t; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
 // a question is named by its type and the number the teacher gave it: "Example 4", "Exercise 3a"
-const typeWord = (d) => d.type === "Worked example" ? "Example" : d.type === "Exercise" ? "Exercise" : "Question";
+const typeWord = (d) => d.type === "Worked example" ? "Example" : d.type === "Exercise" ? "Exercise" : d.type === "Discussion" ? "Discussion" : d.type === "Quiz" ? "Quiz" : "Question";
 const qName = (d) => typeWord(d) + (d.number ? " " + d.number : "");
 // order: textbook questions by volume, chapter, section; then examples before exercises; then by number
-const typeRank = (d) => d.type === "Worked example" ? 0 : d.type === "Exercise" ? 1 : 2;
+const typeRank = (d) => d.type === "Worked example" ? 0 : d.type === "Exercise" ? 1 : d.type === "Discussion" ? 2 : d.type === "Quiz" ? 3 : 4;
 const natCmp = (x, y) => String(x ?? "").localeCompare(String(y ?? ""), undefined, { numeric: true });
 function cmpQ(a, b) {
   return (isFree(a) - isFree(b)) || natCmp(a.volume, b.volume) || natCmp(a.chapter, b.chapter) || natCmp(a.section, b.section) || natCmp(a.topic, b.topic) ||
@@ -801,8 +804,10 @@ function paintAnswer() {
   const pv = partView(q);
   $("ansTitle").textContent = (S.vi < 0 ? "ORIGINAL" : `VARIANT ${S.vi + 1}`) + (pv.split ? ` · PART ${pv.i + 1} OF ${pv.n}` : "") + " · ANSWER";
   // the figure for the answer is drawn automatically, once per question; the button only appears as a retry after a failure
-  if (!figBusy) { $("figBtn").hidden = !(figFail === q); $("figBtn").textContent = "Drawing failed. Try again"; $("figBtn").disabled = false; }
-  if (sample && !rv && !figBusy && figFail !== q && !(q.answer_figures || []).length && !q.figs_checked) setTimeout(() => autoFig(q), 0);
+  if (!figBusy) $("figBtn").hidden = true; // no error buttons: a failed check is simply skipped
+  if (sample && !rv && !figBusy && !(q.answer_figures || []).length && !q.figs_checked) {
+    if (wantsFigure(q)) setTimeout(() => autoFig(q), 0); else q.figs_checked = true; // most questions need no drawing: do not ask Claude
+  }
   const key = (S.orig && S.orig.id || "x") + ":" + S.vi + ":" + (pv.split ? pv.label : "") + ":" + (pv.answer || []).join("|") + "#" + (pv.solution || []).join("|") + "#" + pv.figs.map((f) => f.svg.length).join(",");
   if (key !== ansKey || card.hidden) {
     ansKey = key;
@@ -858,6 +863,11 @@ $("solBtn").onclick = () => {
 $("ansClose").onclick = () => { S.answer = false; paintAnswer(); };
 // ask Claude to draw what the answer needs (a histogram, graph, number line, …) and keep it with the question
 let figBusy = false, figFail = null;
+// only questions that talk about drawing something are sent to Claude to see whether the answer needs a figure
+function wantsFigure(q) {
+  const t = [...(q.question || []), ...(q.answer || []), ...(q.solution || [])].join(" ");
+  return /\b(draw|sketch|plot|graph|histogram|diagram|number line|construct|net of|nets|bar chart|pie chart|pictogram|dot diagram|axes|axis|stem|whisker|venn|mark)\b/i.test(t);
+}
 $("figBtn").onclick = () => { const q = cur(); if (q) { figFail = null; autoFig(q); } };
 async function autoFig(q) {
   if (!q || !sample || figBusy) return;
@@ -890,7 +900,7 @@ Reply with ONLY one JSON object, no other text: {"answer_figures": [{"part": "(1
       try { await db.doc("bank/" + o.id).update(S.vi < 0 ? { answer_figures: figs, figs_checked: true } : { variants: S.variants }); }
       catch (e) { toast("The figure is on screen but couldn't be saved with the question."); }
     }
-  } catch (e) { if (!e || e.code !== "cancelled") { figFail = q; toast(codeMsg(e)); } }
+  } catch (e) { if (!e || e.code !== "cancelled") q.figs_checked = true; /* silent: it is tried again next visit */ }
   finally { clearInterval(tm); figBusy = false; btn.disabled = false; render(); }
 }
 $("bAns").onclick = () => { S.answer = !S.answer; paintAnswer(); };
@@ -898,6 +908,7 @@ $("bAns").onclick = () => { S.answer = !S.answer; paintAnswer(); };
 /* ---------------- Claude ---------------- */
 let sample = null, imgLimits = null, ctl = null, db = null, canWrite = false;
 // graphs with axes are drawn on grid paper so heights and positions can be read off
+const LABELS = `LABELS: no label (vertex letter, length, number) may touch or lie on any line, dashed lines included, and every label must lie fully inside the picture (leave room at the right edge for numbers such as 14.1). Put a vertex letter in the free space outside its corner, away from every edge that meets there; put a length beside its edge, or inside the face if another line crosses it; keep about 3 px clear of lines. Check each label against the lines before answering.`;
 const GRID = `GRAPHS ON GRID PAPER: when a diagram is a statistical or coordinate graph (histogram, bar chart, line graph, scatter plot, function graph, scaled number line), do NOT draw grid lines yourself: the page draws the grid paper behind your drawing. Instead give a grid object describing the plotting area: {"x0": svg x of the left end of the x scale, "x1": svg x of the right end, "xMin": the value at x0, "xMax": the value at x1, "xMajor": spacing of the labelled x ticks, "xMinor": spacing of the grid lines in x, "y0": svg y of the BOTTOM of the y scale, "y1": svg y of the TOP, "yMin": the value at y0, "yMax": the value at y1, "yMajor": spacing of the labelled y ticks, "yMinor": spacing of the grid lines in y}. Choose the minor spacing so the grid is easy to read (for example 1 when the labelled ticks are 5 apart, 2 when they are 10 apart). The axes, ticks, bars, points and labels must use exactly the same scale as the grid object, and nothing may fill the plotting area with an opaque background. The grid object is null when the diagram is not a graph.`;
 const FORMAT = `Reply with ONLY one JSON object, no other text:
 {"question": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer": [string, ...], "solution": [string, ...], "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
@@ -906,11 +917,11 @@ Rules for the strings:
 - "question": one string per paragraph. Each sub-question is its own string starting with its label, e.g. "(a) Find ...", "(i) ...".
 - Write every mathematical expression, variable, fraction, root, angle and equation in LaTeX between single dollar signs, e.g. "$\\\\frac{3}{4}x^2$". Units stay as plain text after the math (e.g. "$24$ cm²" or "24 cm²"). A literal money sign is written \\\\$ (backslash dollar).
 - Separate formatting from content: say each thing once. Never write an expression both as LaTeX and again as plain text (not "$t$ t", not "$x = 3$ x = 3"), and never put LaTeX commands or dollar signs outside the math delimiters.
-- "figure_svg": "" if the question has no diagram. Otherwise a clean redrawing of the diagram as one standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 420, a white background rect, black strokes (stroke-width 2), light grey fills only, dashed lines (stroke-dasharray="6 5") for hidden edges, every label and given length from the original placed beside the right point or side, text in font-family "Times New Roman, serif" font-size 20 (vertex letters italic). No scripts, no images, no external references. ${GRID}
+- "figure_svg": "" if the question has no diagram. Otherwise a clean redrawing of the diagram as one standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 420, a white background rect, black strokes (stroke-width 2), light grey fills only, dashed lines (stroke-dasharray="6 5") for hidden edges, every label and given length from the original placed beside the right point or side, text in font-family "Times New Roman, serif" font-size 20 (vertex letters italic). ${LABELS} No scripts, no images, no external references. ${GRID}
 - "answer": the final answer of each part, one string per part, with its label.
 - "solution": a clear step-by-step worked solution, one short line per string. Write a part's label such as "(a)" only on the FIRST line of that part; every later step of the same part has no label. A question without parts has no labels at all. Check every calculation.
 - "answer_figures": [] unless the answer itself is a drawing that the question asks for (a histogram, graph, number line, net, construction or labelled diagram). Then one {"part": "(1)", "svg": "<svg ...>"} for each part that needs a drawing, with "part" exactly as that part is labelled in "answer" ("" when the question has no parts). Draw it accurately from the data: work out every count, height and position first, label both axes and the scale, and follow the same SVG rules as "figure_svg".`;
-const SVG_RULES = `a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels and numbers in font-family "Times New Roman, serif" font-size 18. No scripts, no images, no external references. ${GRID}`;
+const SVG_RULES = `a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels and numbers in font-family "Times New Roman, serif" font-size 18. LABELS: no label (vertex letter, length, number) may touch or lie on any line, dashed lines included, and every label must lie fully inside the picture (leave room at the right edge for numbers such as 14.1). Put a vertex letter in the free space outside its corner, away from every edge that meets there; put a length beside its edge, or inside the face if another line crosses it; keep about 3 px clear of lines. Check each label's position against the lines before answering. No scripts, no images, no external references. ${GRID}`;
 
 function codeMsg(e) {
   const c = e && e.code;
@@ -971,7 +982,7 @@ $("stopBtn").onclick = () => ctl && ctl.abort();
 /* ---------------- input view ---------------- */
 function openInput(on) { $("inputView").hidden = !on; $("teachView").hidden = on; $("dock").hidden = on; $("topRow").hidden = on; $("side").hidden = on; if (on) $("qInput").focus(); }
 $("newBtn").onclick = () => {
-  setTags("in", { book: B.f.root === "free" ? "FREE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, number: "" });
+  setTags("in", { book: B.f.root === "free" ? "FREE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, difficulty: B.f.diff, number: "" });
   openInput(true);
 };
 $("backBtn").onclick = () => openInput(false);
@@ -1014,6 +1025,7 @@ ${S.images.length ? "The attached image(s) show the question. Transcribe it exac
 ${text ? "\nTeacher's text:\n" + text + "\n" : ""}
 Retype the question cleanly, redraw any diagram, and solve it.
 ${FORMAT}
+Also add the key "difficulty" with exactly one of "Basic", "Intermediate", "Advanced": Basic = one routine step or a direct use of a definition or formula; Intermediate = several steps or a standard multi-part problem; Advanced = needs planning, an unfamiliar context or combining several ideas.
 Also add the key "category" with exactly one of "Concept", "Procedure", "Problem solving": what the question mainly tests (understanding an idea, carrying out a standard method, or planning a solution to an unfamiliar or multi-step problem).
 Also add the key "topic" with exactly one of ${TOPICS.map((t) => '"' + t + '"').join(", ")}: the area of mathematics the question belongs to.`;
   ctl = new AbortController(); busy(true, "Claude is reading the question, redrawing the diagram and solving it… (about 30–60 seconds)");
@@ -1023,6 +1035,7 @@ Also add the key "topic" with exactly one of ${TOPICS.map((t) => '"' + t + '"').
     if (!d) throw { code: "invalid_json" };
     const tags = readTags("in");
     if (!tags.category && CATS.includes(raw.category)) tags.category = raw.category;
+    if (!tags.difficulty && DIFFS.includes(raw.difficulty)) tags.difficulty = raw.difficulty;
     if (tags.book === "FREE" && !tags.topic && TOPICS.includes(raw.topic)) tags.topic = raw.topic;
     S.images = []; drawThumbs(); $("qInput").value = "";
     await addToBank({ ...tags, ...d });
@@ -1038,7 +1051,7 @@ Also add the key "topic" with exactly one of ${TOPICS.map((t) => '"' + t + '"').
 // filters that do not depend on where the question sits in the book
 function nonLoc(d) {
   const f = B.f, q = f.q.trim().toLowerCase();
-  return (!f.type || d.type === f.type) && (!f.cat || d.category === f.cat) &&
+  return (!f.type || d.type === f.type) && (!f.cat || d.category === f.cat) && (!f.diff || d.difficulty === f.diff) &&
     (!q || qName(d).toLowerCase().includes(q) || String(d.number || "").toLowerCase().includes(q) || (d.question || []).join(" ").toLowerCase().includes(q) || String(d.section || "").startsWith(q));
 }
 function matches(d) {
@@ -1066,11 +1079,11 @@ function applyFilters(keepId) {
   if (i < 0) i = B.list.length ? 0 : -1;
   showIndex(i);
 }
-function readFilters() { B.f = { ...B.f, book: "", type: $("fType").value, cat: $("fCat").value, q: $("fSearch").value }; }
+function readFilters() { B.f = { ...B.f, book: "", type: $("fType").value, cat: $("fCat").value, diff: $("fDiff").value, q: $("fSearch").value }; }
 function initBankUI() {
-  fill($("fType"), TYPES, "All"); fill($("fCat"), CATS, "All");
+  fill($("fType"), TYPES, "All"); fill($("fCat"), CATS, "All"); fill($("fDiff"), DIFFS, "All");
   initFilterValues(); readFilters();
-  for (const id of ["fType", "fCat"]) $(id).addEventListener("change", () => { readFilters(); applyFilters(null); });
+  for (const id of ["fType", "fCat", "fDiff"]) $(id).addEventListener("change", () => { readFilters(); applyFilters(null); });
   let t; $("fSearch").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { readFilters(); applyFilters(null); }, 250); });
   let sideOpen = true; try { sideOpen = localStorage.getItem("tb_side") !== "0"; } catch (e) {}
   setSide(sideOpen && !matchMedia("(max-width: 900px)").matches);
@@ -1085,7 +1098,7 @@ async function addToBank(rec) {
     try {
       const ref = await db.collection("bank").add(rec);
       // make sure the new question is visible under the current filters
-      if (!matches(rec)) { B.f = { ...B.f, ...locOf(rec), type: "", cat: "", q: "" }; initFilterValues(); }
+      if (!matches(rec)) { B.f = { ...B.f, ...locOf(rec), type: "", cat: "", diff: "", q: "" }; initFilterValues(); }
       B.lastId = ref.id;
       const local = { id: ref.id, ...rec };
       if (!B.all.some((d) => d.id === ref.id)) B.all.push(local);
@@ -1096,7 +1109,7 @@ async function addToBank(rec) {
   } else toast("The question bank isn't available here, so this question is shown but not saved.");
   S.orig = rec; S.variants = []; S.vi = -1; S.answer = false; render();
 }
-function initFilterValues() { $("fType").value = B.f.type || ""; $("fCat").value = B.f.cat || ""; $("fSearch").value = B.f.q || ""; }
+function initFilterValues() { $("fType").value = B.f.type || ""; $("fCat").value = B.f.cat || ""; $("fDiff").value = B.f.diff || ""; $("fSearch").value = B.f.q || ""; }
 
 /* edit a saved question: tags, wording, answer, solution */
 const toLines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
@@ -1132,7 +1145,7 @@ Current diagram (SVG):
 ${cur}
 
 Reply with ONLY one JSON object, no other text: {"figure_svg": "<svg ...>", "figure_grid": object or null}
-The svg is a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels in font-family "Times New Roman, serif" font-size 18. No scripts, no images, no external references. ${GRID}
+The svg is a standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 480, a white background rect, black strokes (stroke-width 2), light grey fills only, labels in font-family "Times New Roman, serif" font-size 18. ${LABELS} No scripts, no images, no external references. ${GRID}
 Read every bar height, point and label from the current diagram and the question carefully, and keep them unchanged.`;
   ctl = new AbortController();
   const btn = $("edRedraw"), label = btn.textContent, t0 = Date.now(); btn.disabled = true; $("tagSave").disabled = true;
@@ -1246,7 +1259,7 @@ function variantPrompt(base, existing) {
   return `Here is a maths question with its diagram, answer and solution, as JSON:
 ${JSON.stringify({ question: base.question, figure_svg: base.figure_svg, answer: base.answer, solution: base.solution })}
 
-Write ONE new variant of this question. Change ONLY the numbers (lengths, quantities, coefficients, data values). Keep the context, wording, structure, sub-questions and units the same, so the same method solves it. Choose numbers that are realistic and give tidy answers of similar difficulty (avoid ugly decimals unless the original has them). If there is a diagram, return the same diagram with the new numbers in the labels (keep its geometry valid). Recompute the answer and the full solution from scratch and check them.
+Write ONE new variant of this question. Normally change ONLY the numbers (lengths, quantities, coefficients, data values) and keep the context, wording, structure, sub-questions and units the same, so the same method solves it. If the question has no numbers worth changing (a conceptual or reasoning question), vary it in another way that tests the same idea: change the operation (for example difference to sum or product), the property asked about, or the example or objects used, and use your judgement so that the variant is neither easier nor harder and its answer is not the same as the original's. Choose numbers that are realistic and give tidy answers of similar difficulty (avoid ugly decimals unless the original has them). If there is a diagram, return the same diagram with the new numbers in the labels (keep its geometry valid). Recompute the answer and the full solution from scratch and check them.
 ${seen ? "Use numbers different from these earlier variants:\n" + seen + "\n" : ""}Variety key: ${Math.random().toString(36).slice(2, 8)}
 ${FORMAT}`;
 }
