@@ -58,13 +58,13 @@ button:focus-visible, textarea:focus-visible, label.drop:focus-within { outline:
 .mode { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--orig-soft); color: var(--chalk); }
 .mode.variant { background: var(--variant-soft); color: var(--variant); }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.tab { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 5px 14px; font-weight: 700; font-size: 14px; }
+.tab { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 3px 11px; font-weight: 700; font-size: 12px; }
 .tab:hover { border-color: var(--chalk); color: var(--chalk); }
 .tab.cur { background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); }
 .tab.v { color: var(--variant); border-color: var(--variant); }
 .tab.v.cur { background: var(--variant); color: var(--chalk-ink); }
 .dock { gap: 12px; }
-.dock .btn { min-width: 140px; }
+.dock .btn { min-width: 120px; font-size: 14px; padding: 7px 16px; }
 .spacer { flex: 1; }
 .ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); padding: 6px 12px; border-radius: 8px; }
 .ghost:hover { border-color: var(--chalk); color: var(--chalk); }
@@ -246,20 +246,37 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .question { flex: none; }
 .board { flex: 1 0 240px; min-height: 240px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; z-index: 30; max-width: calc(100% - 32px); }
-#backRow, #linkRow { display: none; }
-body.rv #backRow, body.rv #linkRow { display: flex; }
-body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #bVar, body.rv #bExp { display: none !important; }
+#settingsMenu { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
+#settingsMenu[hidden] { display: none; }
+#settingsRow { padding-bottom: 4px; }
+#settingsMenu { gap: 2px; margin-top: 4px; }
+#settingsMenu .btn { border: 0; background: none; box-shadow: none; text-align: left; padding: 6px 8px; font-size: 14px; font-weight: 500; color: var(--ink); border-radius: 6px; }
+#settingsMenu .btn:hover { background: var(--orig-soft); color: var(--chalk); }
+#settingsMenu .btn.fill { background: none; color: var(--chalk); font-weight: 700; }
+.editbar { flex: none; display: flex; gap: 8px; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+.editbar .btn { padding: 4px 14px; font-size: 14px; }
+.loc .sec { font-size: 19px; color: var(--ink); }
+.loc { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; max-width: 36ch; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .loc { display: none; } }
+body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bExp { display: none !important; }
+body:not(.rv) .rv-only { display: none !important; }
 [hidden] { display: none !important; }
-#newBtn, #tagBtn, #delBtn, #adminRow, #bVar, #bExp, #backRow, #linkRow { display: none !important; }
+#editBar, #newBtn, #tagBtn, #delBtn, #settingsRow, #bVar, #bExp { display: none !important; }
 </style>
 
 <div id="app">
   <aside class="side" id="side" aria-label="Question bank">
     <div class="brand">Imitate and Practice <small id="brandTag" style="font-weight:600;color:var(--muted)">· Reader</small></div>
-    <div class="actions"><button class="btn fill" id="newBtn" type="button">New question</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button></div>
-    <div class="actions" id="adminRow" hidden><button class="btn" id="batchBtn" type="button">Make 3 variants for every question</button><button class="btn" id="syncBtn" type="button" title="Saves bank.json. Then ask Claude Code to sync the Reader site.">Sync Reader site</button><button class="btn" id="viewBtn" type="button">Switch to Reader view</button></div>
-    <div class="actions" id="backRow"><button class="btn fill" id="backStudio" type="button">← Back to Studio</button></div>
-    <div class="actions" id="linkRow"><button class="btn" id="linkBtn" type="button">Reader public link</button></div>
+    <div id="settingsRow" hidden>
+      <button class="btn" id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
+      <div id="settingsMenu" hidden>
+        <button class="btn studio-only" id="batchBtn" type="button">Prepare variants and figures for every question</button>
+        <button class="btn studio-only" id="syncBtn" type="button" title="Saves bank.json. Then ask Claude Code to sync the Reader site.">Sync Reader site</button>
+        <button class="btn studio-only" id="viewBtn" type="button">Switch to Reader view</button>
+        <button class="btn rv-only" id="linkBtn" type="button">Reader public link</button>
+        <button class="btn rv-only fill" id="backStudio" type="button">← Back to Studio</button>
+      </div>
+    </div>
     <section class="sgroup" role="search" aria-label="Filters">
       <label class="field"><span>SEARCH</span><input id="fSearch" type="search" placeholder="Number or text"></label>
       <div class="row" style="gap:8px; flex-wrap:nowrap">
@@ -274,8 +291,10 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
     </section>
   </aside>
   <div class="main">
+  <div class="editbar" id="editBar" hidden><button class="btn fill" id="newBtn" type="button">New</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button><button class="btn" id="bExp" type="button">Export</button></div>
   <header class="top" id="topRow">
     <button class="ghost" id="sideBtn" type="button" aria-controls="side" aria-expanded="true">☰ Contents</button>
+    <span class="loc" id="locTag"></span>
     <nav class="tabs" id="vTabs" aria-label="Original and variants"></nav>
     <span class="spacer"></span>
     <span class="nav"><button class="ghost" id="prevQ" type="button" aria-label="Previous question">◀</button><span id="posQ">–</span><button class="ghost" id="nextQ" type="button" aria-label="Next question">▶</button></span>
@@ -329,7 +348,6 @@ body.rv #newBtn, body.rv #tagBtn, body.rv #delBtn, body.rv #adminRow, body.rv #b
 
   <nav class="dock" id="dock" aria-label="Teaching tools">
     <button class="btn" id="bAns" type="button">Answer</button>
-    <button class="btn" id="bExp" type="button">Export</button>
     <button class="btn v fill" id="bVar" type="button">Variant</button>
   </nav>
   </div>
@@ -827,8 +845,18 @@ function render() {
   $("prevQ").disabled = B.idx <= 0; $("nextQ").disabled = B.idx < 0 || B.idx >= B.list.length - 1;
   renderSide(o);
   $("tagBtn").hidden = $("delBtn").hidden = !(o && o.id && db && canWrite);
-  $("newBtn").hidden = !canWrite; if (typeof refreshAdmin === "function") refreshAdmin(); // readers (students) can browse and make their own variants, not add or change questions
+  $("editBar").hidden = !canWrite; $("newBtn").hidden = !canWrite; if (typeof refreshAdmin === "function") refreshAdmin(); // readers (students) can browse and make their own variants, not add or change questions
   renderTabs();
+  { // where this question sits: book, chapter, section, name and number
+    const parts = !o || !o.id ? [] : isFree(o) ? [o.topic || "Not tied to a textbook"] : [o.volume ? "Book " + o.volume : "", o.chapter ? "Ch " + o.chapter : "", o.section || ""];
+    const items = o && o.id ? [...parts, qName(o)].filter(Boolean) : (o && o.example ? ["Example"] : []);
+    const box = $("locTag"); box.textContent = "";
+    items.forEach((t, k) => {
+      if (k) box.append(" · ");
+      if (o && o.id && k === items.length - 1) { const e = document.createElement("span"); e.className = "sec"; e.textContent = t; box.append(e); } else box.append(t);
+    });
+    box.title = items.join(" · ");
+  }
   $("bAns").disabled = !q; $("bExp").disabled = !q;
   $("bAns").classList.toggle("v", isVar); $("bExp").classList.toggle("v", isVar);
   $("bVar").disabled = !o || !sample;
@@ -869,12 +897,8 @@ function wantsFigure(q) {
   return /\b(draw|sketch|plot|graph|histogram|diagram|number line|construct|net of|nets|bar chart|pie chart|pictogram|dot diagram|axes|axis|stem|whisker|venn|mark)\b/i.test(t);
 }
 $("figBtn").onclick = () => { const q = cur(); if (q) { figFail = null; autoFig(q); } };
-async function autoFig(q) {
-  if (!q || !sample || figBusy) return;
-  figBusy = true; figFail = null;
-  const btn = $("figBtn"), t0 = Date.now(); btn.hidden = false; btn.disabled = true;
-  const tick = () => { btn.textContent = "Checking whether the answer needs a drawing… " + Math.round((Date.now() - t0) / 1000) + " s"; };
-  tick(); const tm = setInterval(tick, 1000);
+// asks Claude for the drawings the correct answer of q needs (histogram, graph, pictogram, number line ...)
+async function genFigs(q, signal) {
   const prompt = `A maths question with its answer and worked solution:
 Question:
 ${q.question.join("\n")}
@@ -885,30 +909,40 @@ ${q.answer.join("\n")}
 Solution:
 ${q.solution.join("\n")}
 
-Decide whether the correct answer includes something to draw: a histogram, graph, number line, net, construction or labelled diagram that the question asks for. If it does, draw it accurately from the data in the question and the working above: work out every count, height and position first, label both axes with their scales, and give every part that needs a drawing its own figure.
+Decide whether the correct answer includes something to draw: a histogram, graph, pictogram, bar graph, number line, net, construction or labelled diagram that the question asks for. If it does, draw it accurately from the data in the question and the working above: work out every count, height and position first, label both axes with their scales, and give every part that needs a drawing its own figure.
 Reply with ONLY one JSON object, no other text: {"answer_figures": [{"part": "(1)", "svg": "<svg ...>", "grid": object or null}]}
 - "part" is the label of the part exactly as in the answer lines, or "" when the question has no parts.
 - "svg" is ${SVG_RULES}
 - Use [] if no drawing is needed.`;
+  const r = await sample.json(prompt, { signal, modelTier: "complex", cache: false });
+  return cleanFigs(r.answer_figures);
+}
+function needsFigs(q) { return !!q && wantsFigure(q) && !(q.answer_figures || []).length && !q.figs_checked; }
+async function autoFig(q) {
+  if (!q || !sample || figBusy) return;
+  figBusy = true; figFail = null;
+  const btn = $("figBtn"), t0 = Date.now(); btn.hidden = false; btn.disabled = true;
+  const tick = () => { btn.textContent = "Drawing the figure for the answer… " + Math.round((Date.now() - t0) / 1000) + " s (can take 1–2 minutes)"; };
+  tick(); const tm = setInterval(tick, 1000);
   const ac = new AbortController(); ctl = ac;
+  const stopT = setTimeout(() => ac.abort(), 150000); // never wait longer than 2.5 minutes
   const o = S.orig;
   try {
-    const r = await sample.json(prompt, { signal: ac.signal, modelTier: "complex", cache: false });
-    const figs = cleanFigs(r.answer_figures);
+    const figs = await genFigs(q, ac.signal);
     q.answer_figures = figs; q.figs_checked = true; ansKey = null;
     if (o && o.id && db && canWrite) {
       try { await db.doc("bank/" + o.id).update(S.vi < 0 ? { answer_figures: figs, figs_checked: true } : { variants: S.variants }); }
-      catch (e) { toast("The figure is on screen but couldn't be saved with the question."); }
+      catch (e) { /* the figure is on screen; it is saved the next time */ }
     }
-  } catch (e) { if (!e || e.code !== "cancelled") q.figs_checked = true; /* silent: it is tried again next visit */ }
-  finally { clearInterval(tm); figBusy = false; btn.disabled = false; render(); }
+  } catch (e) { q.figs_checked = true; /* silent: skipped this visit */ }
+  finally { clearTimeout(stopT); clearInterval(tm); figBusy = false; btn.disabled = false; render(); }
 }
 $("bAns").onclick = () => { S.answer = !S.answer; paintAnswer(); };
 
 /* ---------------- Claude ---------------- */
 let sample = null, imgLimits = null, ctl = null, db = null, canWrite = false;
 // graphs with axes are drawn on grid paper so heights and positions can be read off
-const LABELS = `LABELS: no label (vertex letter, length, number) may touch or lie on any line, dashed lines included, and every label must lie fully inside the picture (leave room at the right edge for numbers such as 14.1). Put a vertex letter in the free space outside its corner, away from every edge that meets there; put a length beside its edge, or inside the face if another line crosses it; keep about 3 px clear of lines. Check each label against the lines before answering.`;
+const LABELS = `LABELS: no label (vertex letter, length, number) may touch or lie on any line, dashed lines included, and every label must lie fully inside the picture (leave room at the right edge for numbers such as 14.1). Put a vertex letter in the free space outside its corner, away from every edge that meets there; put a length beside its edge, or inside the face if another line crosses it; keep about 3 px clear of lines. Check each label against the lines before answering. HIDDEN EDGES of solids: an edge is dashed only where a face in front of it hides it; where it passes through an opening (for example the open top of a trough) or beyond the outline of the nearer face, draw it solid. An edge can therefore be partly dashed and partly solid: split it at the point where it crosses the outline of the face that hides it.`;
 const GRID = `GRAPHS ON GRID PAPER: when a diagram is a statistical or coordinate graph (histogram, bar chart, line graph, scatter plot, function graph, scaled number line), do NOT draw grid lines yourself: the page draws the grid paper behind your drawing. Instead give a grid object describing the plotting area: {"x0": svg x of the left end of the x scale, "x1": svg x of the right end, "xMin": the value at x0, "xMax": the value at x1, "xMajor": spacing of the labelled x ticks, "xMinor": spacing of the grid lines in x, "y0": svg y of the BOTTOM of the y scale, "y1": svg y of the TOP, "yMin": the value at y0, "yMax": the value at y1, "yMajor": spacing of the labelled y ticks, "yMinor": spacing of the grid lines in y}. Choose the minor spacing so the grid is easy to read (for example 1 when the labelled ticks are 5 apart, 2 when they are 10 apart). The axes, ticks, bars, points and labels must use exactly the same scale as the grid object, and nothing may fill the plotting area with an opaque background. The grid object is null when the diagram is not a graph.`;
 const FORMAT = `Reply with ONLY one JSON object, no other text:
 {"question": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer": [string, ...], "solution": [string, ...], "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
@@ -980,7 +1014,7 @@ $("stopBtn").onclick = () => ctl && ctl.abort();
 })();
 
 /* ---------------- input view ---------------- */
-function openInput(on) { $("inputView").hidden = !on; $("teachView").hidden = on; $("dock").hidden = on; $("topRow").hidden = on; $("side").hidden = on; if (on) $("qInput").focus(); }
+function openInput(on) { $("editBar").hidden = on || !canWrite; $("inputView").hidden = !on; $("teachView").hidden = on; $("dock").hidden = on; $("topRow").hidden = on; $("side").hidden = on; if (on) $("qInput").focus(); }
 $("newBtn").onclick = () => {
   setTags("in", { book: B.f.root === "free" ? "FREE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, difficulty: B.f.diff, number: "" });
   openInput(true);
@@ -1405,19 +1439,20 @@ $("bExp").onclick = () => exportDoc();
 
 /* ---------------- studio only: batch variants and sync to the Reader site ---------------- */
 function refreshAdmin() {
-  $("adminRow").hidden = !(db && canWrite);
-  const left = B.all.filter((d) => (d.variants || []).length < MAXV).length;
-  $("batchBtn").textContent = left ? `Make 3 variants for every question (${left} left)` : "All questions have 3 variants";
+  $("settingsRow").hidden = !((db && canWrite) || rv);
+  const left = B.all.filter(needsPrep).length;
+  $("batchBtn").textContent = left ? `Prepare variants and figures for every question (${left} left)` : "All questions are ready (3 variants, figures drawn)";
   $("batchBtn").disabled = !left || !sample || batchRun;
 }
 var batchRun = false;
+function needsPrep(d) { return !!d && !!d.id && ((d.variants || []).length < MAXV || needsFigs(d) || (d.variants || []).some(needsFigs)); }
 $("batchBtn").onclick = async () => {
   if (batchRun || !sample || !canWrite) return;
-  const queue = B.all.filter((d) => d.id && (d.variants || []).length < MAXV);
+  const queue = B.all.filter(needsPrep);
   if (!queue.length) return;
   batchRun = true; ctl = new AbortController(); const signal = ctl.signal;
   let done = 0, fail = 0; const total = queue.length;
-  const show = () => busy(true, `Making variants… ${done} of ${total} questions done${fail ? ", " + fail + " problems" : ""}. This takes a while. Press Stop to pause; press the button again to continue where it stopped.`);
+  const show = () => busy(true, `Preparing variants and figures… ${done} of ${total} questions done${fail ? ", " + fail + " problems" : ""}. This takes a while. Press Stop to pause; press the button again to continue where it stopped.`);
   show();
   const worker = async () => {
     while (queue.length && !signal.aborted) {
@@ -1431,6 +1466,16 @@ $("batchBtn").onclick = async () => {
           await db.doc("bank/" + d.id).update({ variants: vs });
           d.variants = vs;
         }
+        // draw the figures the answers need now, so that nobody waits for them in class and the Reader site has them
+        let changed = false;
+        for (const item of [d, ...vs]) {
+          if (signal.aborted) break;
+          if (needsFigs(item)) {
+            try { item.answer_figures = await genFigs(item, signal); item.figs_checked = true; changed = true; }
+            catch (e) { if (e && e.code === "cancelled") break; item.figs_checked = true; }
+          }
+        }
+        if (changed) { d.variants = vs; await db.doc("bank/" + d.id).update({ variants: vs, answer_figures: d.answer_figures || [], figs_checked: true }); }
         if (vs.length >= MAXV) done++;
       } catch (e) { if (e && e.code === "cancelled") break; fail++; }
       show();
@@ -1438,11 +1483,13 @@ $("batchBtn").onclick = async () => {
   };
   await Promise.all([worker(), worker()]);
   batchRun = false; busy(false); ctl = null; applyFilters((S.orig && S.orig.id) || null);
-  toast(signal.aborted ? "Paused. Press the button again to continue." : fail ? `Finished, but ${fail} question(s) need another try: press the button again.` : "Every question now has 3 variants.");
+  toast(signal.aborted ? "Paused. Press the button again to continue." : fail ? `Finished, but ${fail} question(s) need another try: press the button again.` : "Every question has its 3 variants and figures.");
 };
 // Sync: save the whole bank as bank.json; the sync script (or Claude Code) then publishes it to the Reader site
 // preview the Reader as students see it (no editing, only Answer in the dock), and go back
 var rv = false, rvWrite = false;
+$("settingsBtn").onclick = () => { const m = $("settingsMenu"); m.hidden = !m.hidden; $("settingsBtn").setAttribute("aria-expanded", String(!m.hidden)); };
+$("settingsMenu").addEventListener("click", (e) => { if (e.target.closest("button")) { $("settingsMenu").hidden = true; $("settingsBtn").setAttribute("aria-expanded", "false"); } });
 $("viewBtn").onclick = () => { rv = true; rvWrite = canWrite; canWrite = false; document.body.classList.add("rv"); S.answer = false; applyFilters((S.orig && S.orig.id) || null); toast("Reader view. Press “Back to Studio” to edit again."); };
 $("backStudio").onclick = () => { rv = false; canWrite = rvWrite; document.body.classList.remove("rv"); applyFilters((S.orig && S.orig.id) || null); };
 // public link of the Reader site: copy it and show a QR code students can scan
