@@ -652,7 +652,7 @@ function labelOf(line) { const m = /^\s*(\((?:[a-z]|\d{1,2}|i{1,3}|iv|v|vi{0,3})
 
 /* ---------------- parts: a long question is shown one part at a time ---------------- */
 const ROMAN = /^\((i|ii|iii|iv|v|vi)\)$/;
-const FOOTER = /^(give|leave|express|take|use|round|show your|hint|note|state your|correct your)\b/i; // closing sentences that belong to every part
+const FOOTER = /^(explain|give|leave|express|take|use|round|show your|hint|note|state your|correct your)\b/i; // closing sentences that belong to every part
 // Split lines into: shared lead-in (pre), top-level parts (a)(b)… or (1)(2)…, and shared closing sentences (post). Sub-parts (i)(ii) stay with their part.
 function groupParts(lines) {
   const pre = [], parts = [], post = []; let cur = null;
@@ -914,7 +914,7 @@ const FORMAT = `Reply with ONLY one JSON object, no other text:
 {"question": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer": [string, ...], "solution": [string, ...], "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
 Rules for the strings:
 - Keep the original language of the question (English stays English, Chinese stays Chinese). Do not translate.
-- "question": one string per paragraph. Each sub-question is its own string starting with its label, e.g. "(a) Find ...", "(i) ...".
+- "question": one string per paragraph. Each sub-question is its own string starting with its label, e.g. "(a) Find ...", "(i) ...". Labels are for sub-questions ONLY. Conditions or options that the sub-questions refer to (for example results (a), (b), (c) drawn in a figure) are not sub-questions: when short, put their wording in the figure as captions under each drawing; otherwise write them as "Result (a): ..." so the line does not start with a bare label.
 - Write every mathematical expression, variable, fraction, root, angle and equation in LaTeX between single dollar signs, e.g. "$\\\\frac{3}{4}x^2$". Units stay as plain text after the math (e.g. "$24$ cm²" or "24 cm²"). A literal money sign is written \\\\$ (backslash dollar).
 - Separate formatting from content: say each thing once. Never write an expression both as LaTeX and again as plain text (not "$t$ t", not "$x = 3$ x = 3"), and never put LaTeX commands or dollar signs outside the math delimiters.
 - "figure_svg": "" if the question has no diagram. Otherwise a clean redrawing of the diagram as one standalone SVG: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H"> with W about 420, a white background rect, black strokes (stroke-width 2), light grey fills only, dashed lines (stroke-dasharray="6 5") for hidden edges, every label and given length from the original placed beside the right point or side, text in font-family "Times New Roman, serif" font-size 20 (vertex letters italic). ${LABELS} No scripts, no images, no external references. ${GRID}
