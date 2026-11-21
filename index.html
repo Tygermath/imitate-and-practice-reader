@@ -200,6 +200,7 @@ dl.tagdl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .field select:disabled { opacity: .5; }
 .field select:focus-visible, .field input:focus-visible { outline: 3px solid var(--chalk); outline-offset: 1px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.tagtxt { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .nav { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .note { font-size: 13px; color: var(--muted); }
@@ -295,6 +296,7 @@ body:not(.rv) .rv-only { display: none !important; }
   <header class="top" id="topRow">
     <button class="ghost" id="sideBtn" type="button" aria-controls="side" aria-expanded="true">☰ Contents</button>
     <span class="loc" id="locTag"></span>
+    <span class="chips" id="tagChips" style="flex:none"></span>
     <nav class="tabs" id="vTabs" aria-label="Original and variants"></nav>
     <span class="spacer"></span>
     <span class="nav"><button class="ghost" id="prevQ" type="button" aria-label="Previous question">◀</button><span id="posQ">–</span><button class="ghost" id="nextQ" type="button" aria-label="Next question">▶</button></span>
@@ -856,6 +858,8 @@ function render() {
       if (o && o.id && k === items.length - 1) { const e = document.createElement("span"); e.className = "sec"; e.textContent = t; box.append(e); } else box.append(t);
     });
     box.title = items.join(" · ");
+    const tc = $("tagChips"); tc.textContent = "";
+    if (o && o.id) [o.difficulty, o.category].filter(Boolean).forEach(t => { const c = document.createElement("span"); c.className = "tagtxt"; c.textContent = t; tc.append(c); });
   }
   $("bAns").disabled = !q; $("bExp").disabled = !q;
   $("bAns").classList.toggle("v", isVar); $("bExp").classList.toggle("v", isVar);
