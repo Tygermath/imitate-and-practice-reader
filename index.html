@@ -261,8 +261,37 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 @media (max-width: 640px) { .loc { display: none; } }
 body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bExp { display: none !important; }
 body:not(.rv) .rv-only { display: none !important; }
+/* floating button: jump back to the top of the (long) contents column */
+.sideTop { position: sticky; bottom: 12px; align-self: flex-end; margin-top: -8px; flex: none; z-index: 5; display: inline-flex; align-items: center; gap: 6px;
+  border: 2px solid var(--chalk); background: var(--card); color: var(--chalk); border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 13px; box-shadow: var(--shadow); }
+.sideTop:hover { background: var(--chalk); color: var(--chalk-ink); }
+
+/* Filter: Scenario, Competency and Level folded into one expandable block */
+.fold { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-weight: 700; font-size: 14px; border-radius: 8px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { content: "\25B8"; color: var(--muted); width: 1em; transition: transform .15s; }
+.fold[open] > summary::before { transform: rotate(90deg); }
+.fold > summary:hover { background: var(--board); }
+.fold > summary:focus-visible { outline: 3px solid var(--chalk); outline-offset: 2px; }
+.fcount { font-size: 12px; font-weight: 700; background: var(--chalk); color: var(--chalk-ink); border-radius: 999px; padding: 1px 8px; }
+.foldbody { display: grid; gap: 10px; padding: 4px 10px 12px; }
+@media (prefers-reduced-motion: reduce) { .fold > summary::before { transition: none; } }
+
+/* rating buttons (Studio only): good / no opinion / bad. Click the lit one again to clear it. */
+.rate { display: inline-flex; gap: 2px; flex: none; }
+.rate button { border: 1px solid transparent; background: transparent; border-radius: 999px; width: 30px; height: 30px; padding: 0; font-size: 17px; line-height: 1; filter: grayscale(1); opacity: .4; }
+.rate button:hover:not(:disabled) { opacity: .85; border-color: var(--line); }
+.rate button.on { filter: none; opacity: 1; background: var(--orig-soft); border-color: var(--chalk); }
+.rate button#rDown.on { background: var(--variant-soft); border-color: var(--variant); }
+.rate button:disabled { cursor: default; }
+
+.dock .rate { gap: 6px; }
+.dock .rate button { width: 42px; height: 42px; font-size: 22px; border-color: var(--line); }
+.dock .rate button.on { border-color: var(--chalk); }
+.dock .rate button#rDown.on { border-color: var(--variant); }
 [hidden] { display: none !important; }
-#editBar, #newBtn, #tagBtn, #delBtn, #settingsRow, #bVar, #bExp { display: none !important; }
+#editBar, #newBtn, #tagBtn, #delBtn, #settingsRow, #bVar, #bExp, #bCom, #comCard, #rateBox, .studio-only { display: none !important; }
 </style>
 
 <div id="app">
@@ -280,16 +309,20 @@ body:not(.rv) .rv-only { display: none !important; }
     </div>
     <section class="sgroup" role="search" aria-label="Filters">
       <label class="field"><span>SEARCH</span><input id="fSearch" type="search" placeholder="Number or text"></label>
-      <div class="row" style="gap:8px; flex-wrap:nowrap">
-        <label class="field"><span>SCENARIO</span><select id="fType"></select></label>
-        <label class="field"><span>COMPETENCY</span><select id="fCat"></select></label>
-      </div>
-      <label class="field"><span>LEVEL</span><select id="fDiff"></select></label>
+      <details class="fold" id="filterFold">
+        <summary><span>Filter</span><span class="fcount" id="fCount" hidden></span></summary>
+        <div class="foldbody">
+          <label class="field"><span>SCENARIO</span><select id="fType"></select></label>
+          <label class="field"><span>COMPETENCY</span><select id="fCat"></select></label>
+          <label class="field"><span>LEVEL</span><select id="fDiff"></select></label>
+        </div>
+      </details>
     </section>
     <section class="sgroup" aria-labelledby="treeHead">
-      <h2 id="treeHead">New Discovering Mathematics</h2>
+      <h2 id="treeHead">Textbooks</h2>
       <nav class="tree" id="tree" aria-labelledby="treeHead"></nav>
     </section>
+    <button class="sideTop" id="sideTop" type="button" hidden aria-label="Back to the top of the contents">&#8593; Top</button>
   </aside>
   <div class="main">
   <div class="editbar" id="editBar" hidden><button class="btn fill" id="newBtn" type="button">New</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button><button class="btn" id="bExp" type="button">Export</button></div>
@@ -336,6 +369,18 @@ body:not(.rv) .rv-only { display: none !important; }
       <div class="qfig" id="qFig" hidden><img id="qFigImg" alt="Question diagram"></div>
     </div>
     <div class="board" aria-label="Blank space for explaining">
+      <div class="answer expanded" id="kkCard" hidden>
+        <div class="head"><h3>KEY KNOWLEDGE</h3><span class="spacer"></span><button class="link" id="kkClose" type="button" aria-label="Close key knowledge">Close</button></div>
+        <div class="ans" id="kkBody"></div>
+      </div>
+      <div class="answer expanded" id="ksCard" hidden>
+        <div class="head"><h3>KEY STEPS</h3><span class="spacer"></span><button class="link" id="ksClose" type="button" aria-label="Close key steps">Close</button></div>
+        <div class="ans" id="ksBody"></div>
+      </div>
+      <div class="answer expanded studio-only" id="comCard" hidden>
+        <div class="head"><h3>COMMENT</h3><span class="spacer"></span><button class="link" id="comClose" type="button" aria-label="Close comment">Close</button></div>
+        <div class="ans" id="comBody"></div>
+      </div>
       <div class="answer" id="ansCard" hidden>
         <div class="head"><h3 id="ansTitle">ORIGINAL · ANSWER</h3><span class="spacer"></span>
           <button class="link" id="figBtn" type="button" hidden>Draw figure</button>
@@ -350,7 +395,11 @@ body:not(.rv) .rv-only { display: none !important; }
 
   <nav class="dock" id="dock" aria-label="Teaching tools">
     <button class="btn" id="bAns" type="button">Answer</button>
+    <button class="btn" id="bKK" type="button">Key Knowledge</button>
+    <button class="btn" id="bKS" type="button">Key Steps</button>
     <button class="btn v fill" id="bVar" type="button">Variant</button>
+    <span class="rate studio-only" id="rateBox" role="group" aria-label="Rating"><button type="button" id="rUp" aria-pressed="false" title="Good (click again to clear)" aria-label="Thumbs up">&#128077;</button><button type="button" id="rDown" aria-pressed="false" title="Needs work (click again to clear)" aria-label="Thumbs down">&#128078;</button></span>
+    <button class="btn studio-only" id="bCom" type="button">Comment</button>
   </nav>
   </div>
 </div>
@@ -365,6 +414,9 @@ body:not(.rv) .rv-only { display: none !important; }
       <label class="field"><span>QUESTION · ONE PARAGRAPH OR PART PER LINE</span><textarea id="edQ" rows="7"></textarea></label>
       <label class="field"><span>ANSWER · ONE PART PER LINE</span><textarea id="edA" rows="3"></textarea></label>
       <label class="field"><span>SOLUTION · ONE STEP PER LINE</span><textarea id="edS" rows="6"></textarea></label>
+      <label class="field"><span>KEY KNOWLEDGE · ONE LINE PER PARAGRAPH · SHOWN ON THE "KEY KNOWLEDGE" BUTTON</span><textarea id="edKK" rows="3"></textarea></label>
+      <label class="field"><span>KEY STEPS · ONE LINE PER STEP · SHOWN ON THE "KEY STEPS" BUTTON</span><textarea id="edKS" rows="3"></textarea></label>
+      <label class="field"><span>COMMENT · ONE LINE PER PARAGRAPH · SHOWN ONLY IN STUDIO</span><textarea id="edCom" rows="3"></textarea></label>
       <label class="check" id="edFigWrap"><input type="checkbox" id="edFig" checked> Keep the diagram</label>
       <button class="ghost" id="edRedraw" type="button">Redraw the diagram (graphs on grid paper)</button>
       <label class="check"><input type="checkbox" id="edCheck" checked> After saving, check that the answer and solution still match</label>
@@ -440,7 +492,14 @@ const cur = () => S.vi < 0 ? S.orig : S.variants[S.vi];
 /* ---------------- textbook contents (New Discovering Mathematics) ---------------- */
 // volumes, chapters and sections as listed in the STAR Publishing NDM e-books (Books 1-4)
 const TOC = {"1":[{"n":1,"title":"Factors and Multiples","sections":[["1.1","Primes, Prime Factorisation and Index Notation"],["1.2","Highest Common Factor (HCF)"],["1.3","Lowest Common Multiple (LCM)"],["1.4","Square Roots and Cube Roots"]]},{"n":2,"title":"Real Numbers","sections":[["2.1","Concept of Negative Numbers and the Number Line"],["2.2","Addition and Subtraction of Integers"],["2.3","Multiplication, Division and Combined Operations of Integers"],["2.4","Rational Numbers, Irrational Numbers and Real Numbers"],["2.5","Operations on Real Numbers"]]},{"n":3,"title":"Approximation and Estimation","sections":[["3.1","Rounding Off Numbers to Specified Decimal Places"],["3.2","Rounding Off Numbers to Specified Significant Figures"],["3.3","Estimation"]]},{"n":4,"title":"Basic Algebra and Algebraic Manipulations","sections":[["4.1","Introduction to Algebra"],["4.2","Simplification of Linear Expressions"],["4.3","Expansion of Linear Expressions"],["4.4","Factorisation of Algebraic Expressions"]]},{"n":5,"title":"Simple Equations in One Variable","sections":[["5.1","Simple Linear Equations in One Variable"],["5.2","Linear Equations Involving Brackets and Fractions"],["5.3","Simple Fractional Equations"],["5.4","Formulate Linear Equations to Solve Word Problems"]]},{"n":6,"title":"Angles and Parallel Lines","sections":[["6.1","Points, Lines and Planes"],["6.2","Angles"],["6.3","Parallel Lines and Transversals"]]},{"n":7,"title":"Triangles, Quadrilaterals and Other Polygons","sections":[["7.1","Triangles"],["7.2","Quadrilaterals"],["7.3","Polygons"],["7.4","Construction of Triangles and Quadrilaterals"]]},{"n":8,"title":"Ratio, Rate and Speed","sections":[["8.1","Ratio"],["8.2","Rate"],["8.3","Speed"]]},{"n":9,"title":"Percentage","sections":[["9.1","Introduction to Percentage"],["9.2","Percentage Change"],["9.3","Reverse Percentage"],["9.4","Problems Involving Percentages in Practical Situations"]]},{"n":10,"title":"Sequences and Number Patterns","sections":[["10.1","Sequences"],["10.2","Number Patterns Involving Geometric Figures"]]},{"n":11,"title":"Linear Functions and Graphs","sections":[["11.1","Cartesian Coordinates"],["11.2","Concept of a Function"],["11.3","Linear Functions and Linear Graphs"],["11.4","Gradient of Linear Graphs"]]},{"n":12,"title":"Perimeter and Area of Plane Figures","sections":[["12.1","Perimeter and Area of Parallelograms"],["12.2","Perimeter and Area of Trapeziums"],["12.3","Perimeter and Area of Composite Plane Figures"]]},{"n":13,"title":"Volume and Surface Area of Prisms and Cylinders","sections":[["13.1","Views and Nets of 3D Objects"],["13.2","Volume and Total Surface Area of Prisms"],["13.3","Volume and Total Surface Area of Cylinders"],["13.4","Volume and Surface Area of Composite Solids"]]},{"n":14,"title":"Data Handling","sections":[["14.1","Collecting Data"],["14.2","Organising Data"],["14.3","Representing and Analysing Data"],["14.4","Statistics in Real Life"]]}],"2":[{"n":1,"title":"Linear Inequalities","sections":[["1.1","Simple Linear Inequalities"],["1.2","Linear Inequalities in One Variable"]]},{"n":2,"title":"Linear Equations in Two Variables","sections":[["2.1","Graphs of Linear Equations in Two Variables (ax + by = c)"],["2.2","Solving Simultaneous Linear Equations by the Graphical Method"],["2.3","Solving Simultaneous Linear Equations by Algebraic Methods"],["2.4","Applications of Simultaneous Equations"]]},{"n":3,"title":"Expansion and Factorisation of Algebraic Expressions","sections":[["3.1","Quadratic Expressions"],["3.2","Expansion of the Product of Algebraic Expressions"],["3.3","Expansion Using Special Products of Algebraic Expressions"],["3.4","Factorisation of ax² + bx + c"],["3.5","Factorisation Using Special Products of Algebraic Expressions"],["3.6","Factorisation by Grouping Terms"]]},{"n":4,"title":"Algebraic Fractions and Formulae","sections":[["4.1","Simplifying Algebraic Fractions"],["4.2","Multiplication and Division of Algebraic Fractions"],["4.3","Addition and Subtraction of Algebraic Fractions"],["4.4","Algebraic Formulae"]]},{"n":5,"title":"Quadratic Functions, Graphs and Equations","sections":[["5.1","Graphs of Quadratic Functions"],["5.2","Solving Quadratic Equations by Factorisation"],["5.3","Applications of Quadratic Equations in Real-world Contexts"]]},{"n":6,"title":"Proportion","sections":[["6.1","Direct Proportion"],["6.2","Inverse Proportion"]]},{"n":7,"title":"Congruence and Similarity","sections":[["7.1","Congruence"],["7.2","Similarity"],["7.3","Applications of Similarity"]]},{"n":8,"title":"Pythagoras' Theorem","sections":[["8.1","Pythagoras' Theorem and Its Converse"],["8.2","Applications of Pythagoras' Theorem"]]},{"n":9,"title":"Trigonometric Ratios","sections":[["9.1","Trigonometric Ratios of Acute Angles"],["9.2","Applications of Trigonometric Ratios in Real-world Contexts"]]},{"n":10,"title":"Volume and Surface Area of Pyramids, Cones and Spheres","sections":[["10.1","Pyramids"],["10.2","Cones"],["10.3","Spheres"]]},{"n":11,"title":"Statistical Diagrams","sections":[["11.1","Dot Diagrams"],["11.2","Histograms"],["11.3","Stem-and-leaf Diagrams"]]},{"n":12,"title":"Measures of Central Tendency","sections":[["12.1","Mean"],["12.2","Median"],["12.3","Mode"]]},{"n":13,"title":"Probability","sections":[["13.1","Introduction to Probability"],["13.2","More Problems Involving Probability"]]}],"3":[{"n":1,"title":"More About Quadratic Equations and Quadratic Functions","sections":[["1.1","Solving Quadratic Equations by Completing the Square"],["1.2","Solving Quadratic Equations by Using Quadratic Formula"],["1.3","Solving Quadratic Equations by Using Graphical Method"],["1.4","Solving Fractional Equations that can be Reduced to Quadratic Equations"],["1.5","Solving Real-world Problems Involving Quadratic Equations"],["1.6","Sketching the Graphs of Quadratic Functions"]]},{"n":2,"title":"More About Linear Inequalities","sections":[["2.1","Notations and Basic Properties of Inequalities"],["2.2","Simultaneous Linear Inequalities"],["2.3","Applications of Simultaneous Linear Inequalities"]]},{"n":3,"title":"Indices","sections":[["3.1","Positive Integer Indices and Laws of Indices"],["3.2","Zero and Negative Integer Indices"],["3.3","Fractional Indices"],["3.4","Solving Equations Involving Indices"],["3.5","Standard Form"],["3.6","Application of Indices to Compound Interest"]]},{"n":4,"title":"Coordinate Geometry","sections":[["4.1","Gradient of a Straight Line"],["4.2","Equation of a Straight Line"],["4.3","Length of a Line Segment"],["4.4","Geometric Problems Involving the Use of Coordinates"]]},{"n":5,"title":"Functions and Graphs","sections":[["5.1","Graphs of Power Functions"],["5.2","Graphs of Exponential Functions"],["5.3","Gradients of Curves"],["5.4","Graphs of Simple Sums of Power Functions"],["5.5","Graphs in Practical Situations"]]},{"n":6,"title":"Conditions of Congruence and Similarity","sections":[["6.1","Congruence Tests"],["6.2","Similarity Tests"],["6.3","Ratio of Areas of Similar Plane Figures"],["6.4","Ratio of Volumes of Similar Solids"],["6.5","Perpendicular Bisectors, Angle Bisectors and Scale Drawings"]]},{"n":7,"title":"Further Trigonometry","sections":[["7.1","Sine and Cosine of Obtuse Angles"],["7.2","Formula for the Area of a Triangle"],["7.3","The Sine Rule"],["7.4","The Cosine Rule"]]},{"n":8,"title":"Applications of Trigonometry","sections":[["8.1","Bearing Problems"],["8.2","Angles of Elevation and Depression"],["8.3","Simple Three-dimensional Problems"]]},{"n":9,"title":"Arc Lengths, Sector Areas and Radian Measure","sections":[["9.1","Arc Lengths"],["9.2","Sector Areas and Segment Areas"],["9.3","Radian Measure"],["9.4","Arc Length and Sector Area in Radian Measure"]]},{"n":10,"title":"Properties of Circles","sections":[["10.1","Chords of a Circle"],["10.2","Angles at the Circumference"],["10.3","Angles in the Same Segment and Opposite Segments"],["10.4","Tangents to a Circle"]]}],"4":[{"n":1,"title":"Set Language and Notation","sections":[["1.1","Set Language"],["1.2","Venn Diagrams and Complement of a Set"],["1.3","Intersection and Union of Sets"]]},{"n":2,"title":"Data Analysis – Measures of Spread","sections":[["2.1","Cumulative Frequency Diagrams"],["2.2","Range, Quartiles, Interquartile Range and Percentiles"],["2.3","Box-and-Whisker Plots"],["2.4","Standard Deviation for Ungrouped Data"],["2.5","Standard Deviation for Grouped Data"]]},{"n":3,"title":"Probability","sections":[["3.1","Probability of Simple Combined Events"],["3.2","Mutually Exclusive Events and Addition Law of Probabilities"],["3.3","Independent Events and Multiplication Law of Probabilities"]]},{"n":4,"title":"Matrices","sections":[["4.1","Definition of a Matrix"],["4.2","Addition and Subtraction of Matrices"],["4.3","Matrix Multiplication"],["4.4","Applications of Matrices"]]},{"n":5,"title":"Vectors in Two Dimensions","sections":[["5.1","Introduction to Vectors"],["5.2","Addition and Subtraction of Vectors"],["5.3","Scalar Multiplication of Vectors"],["5.4","Position Vectors"],["5.5","Applications of Vectors"]]}]};
-const BOOKS = [["NDM", "New Discovering Mathematics"], ["FREE", "Not tied to a textbook"]];
+const BOOKS = [["NDM", "New Discovering Mathematics"], ["HLE", "國中翰林版"], ["FREE", "Not tied to a textbook"]];
+const TOC_HLE = {"H1":[{"n":1,"title":"數與數線","sections":[["1-1","正數與負數"],["1-2","正負數的加減"],["1-3","正負數的乘除"],["1-4","指數記法與科學記號"]]},{"n":2,"title":"標準分解式與分數運算","sections":[["2-1","質因數分解"],["2-2","最大公因數與最小公倍數"],["2-3","分數的四則運算"],["2-4","指數律"]]},{"n":3,"title":"一元一次方程式","sections":[["3-1","式子的運算"],["3-2","解一元一次方程式"],["3-3","應用問題"]]}],"H2":[{"n":1,"title":"二元一次聯立方程式","sections":[["1-1","二元一次方程式"],["1-2","解二元一次聯立方程式"],["1-3","應用問題"]]},{"n":2,"title":"直角坐標與二元一次方程式的圖形","sections":[["2-1","直角坐標平面"],["2-2","二元一次方程式的圖形"]]},{"n":3,"title":"比例","sections":[["3-1","比例式"],["3-2","正比與反比"]]},{"n":4,"title":"一元一次不等式","sections":[["4-1","一元一次不等式的解及圖示"],["4-2","解一元一次不等式及其應用"]]},{"n":5,"title":"統計圖表與統計數據","sections":[]},{"n":6,"title":"線對稱與三視圖","sections":[]}],"H3":[{"n":1,"title":"乘法公式與多項式","sections":[["1-1","乘法公式"],["1-2","多項式的加減"],["1-3","多項式的乘除"]]},{"n":2,"title":"平方根與畢氏定理","sections":[["2-1","平方根的意義"],["2-2","根式的運算"],["2-3","畢氏定理"]]},{"n":3,"title":"因式分解","sections":[["3-1","提公因式與乘法公式作因式分解"],["3-2","利用十字交乘法因式分解"]]},{"n":4,"title":"一元二次方程式","sections":[["4-1","因式分解法解一元二次方程式"],["4-2","配方法與公式解"],["4-3","應用問題"]]},{"n":5,"title":"統計資料處理","sections":[]}],"H4":[{"n":1,"title":"數列與級數","sections":[["1-1","認識數列與等差數列"],["1-2","等差級數"],["1-3","等比數列"]]},{"n":2,"title":"線型函數與其圖形","sections":[]},{"n":3,"title":"三角形的基本性質","sections":[["3-1","內角與外角"],["3-2","基本的尺規作圖"],["3-3","三角形的全等性質"],["3-4","中垂線與角平分線性質"],["3-5","三角形的邊角關係"]]},{"n":4,"title":"平行與四邊形","sections":[["4-1","平行線與截角性質"],["4-2","平行四邊形"],["4-3","特殊四邊形"]]}],"H5":[{"n":1,"title":"相似形與三角比","sections":[["1-1","連比"],["1-2","比例線段"],["1-3","相似多邊形"],["1-4","相似三角形的應用與三角比"]]},{"n":2,"title":"圓形","sections":[["2-1","點、線、圓"],["2-2","圓心角與圓周角"]]},{"n":3,"title":"推理證明與三角形的心","sections":[["3-1","推理證明"],["3-2","三角形的外心、內心與重心"]]}],"H6":[{"n":1,"title":"二次函數","sections":[["1-1","基本二次函數圖形"],["1-2","二次函數圖形與最大值、最小值"]]},{"n":2,"title":"統計與機率","sections":[["2-1","四分位數與盒狀圖"],["2-2","機率"]]},{"n":3,"title":"立體圖形","sections":[["3-1","角柱與圓柱"],["3-2","角錐與圓錐"]]}]};
+const HLE_VOL = {"H1": "第一冊 (1上)", "H2": "第二冊 (1下)", "H3": "第三冊 (2上)", "H4": "第四冊 (2下)", "H5": "第五冊 (3上)", "H6": "第六冊 (3下)"};
+Object.assign(TOC, TOC_HLE);
+const isHle = (v) => /^H/.test(String(v || ""));
+const volLabel = (v) => isHle(v) ? "翰林 " + (HLE_VOL[v] || v) : "Book " + v;
+const rootOf = (d) => isFree(d) ? "free" : d.book === "HLE" ? "hle" : "ndm";
+
 // questions that do not come from a textbook are filed by area of mathematics
 const TOPICS = ["Numbers / Algebra", "Shapes / Geometry", "Changes / Precalculus", "Data and Uncertainty / Probability and Statistics"];
 const isFree = (d) => d && d.book === "FREE";
@@ -453,7 +512,7 @@ function fill(sel, items, first) {
   for (const it of items) { const [val, lab] = Array.isArray(it) ? it : [it, it]; sel.add(new Option(lab, val)); }
   if ([...sel.options].some((o) => o.value === v)) sel.value = v;
 }
-const volItems = () => Object.keys(TOC).map((v) => [v, "Book " + v]);
+const volItems = (book) => Object.keys(TOC).filter((v) => !book || book === "FREE" || (book === "HLE") === isHle(v)).map((v) => [v, volLabel(v)]);
 const chapItems = (vol) => (TOC[vol] || []).map((c) => [String(c.n), `${c.n} ${c.title}`]);
 function secItems(vol, chap) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(chap)); return c ? c.sections.map(([n, t]) => [n, `${n} ${t}`]) : []; }
 // one set of BOOK/VOLUME/CHAPTER/SECTION/TYPE/CATEGORY selects; p = id prefix, first = label of the empty choice
@@ -463,12 +522,12 @@ function cascade(p, first) {
   fill(sec, secItems(vol.value, chap.value), chap.value ? first : (first === "All" ? "All" : "Choose a chapter")); sec.disabled = !chap.value;
 }
 function setupSelects(p, first) {
-  fill($(p + "Book"), BOOKS, first); fill($(p + "Vol"), volItems(), first);
+  fill($(p + "Book"), BOOKS, first); fill($(p + "Vol"), volItems($(p + "Book").value), first);
   fill($(p + "Type"), TYPES, first); fill($(p + "Cat"), CATS, first); fill($(p + "Diff"), DIFFS, first);
   fill($(p + "Topic"), TOPICS, first);
   $(p + "Vol").addEventListener("change", () => { $(p + "Chap").value = ""; $(p + "Sec").value = ""; cascade(p, first); });
   $(p + "Chap").addEventListener("change", () => { $(p + "Sec").value = ""; cascade(p, first); });
-  $(p + "Book").addEventListener("change", () => syncBook(p));
+  $(p + "Book").addEventListener("change", () => { fill($(p + "Vol"), volItems($(p + "Book").value), first); $(p + "Vol").value = ""; $(p + "Chap").value = ""; $(p + "Sec").value = ""; cascade(p, first); syncBook(p); });
   cascade(p, first); syncBook(p);
 }
 // a textbook question has volume, chapter and section; a question not tied to a textbook has a topic instead
@@ -490,7 +549,7 @@ function tagGrid(el, p) {
   setupSelects(p, "—");
 }
 function setTags(p, t) {
-  $(p + "Book").value = t.book || "NDM"; $(p + "Vol").value = t.volume || ""; cascade(p, "—");
+  $(p + "Book").value = t.book || "NDM"; fill($(p + "Vol"), volItems($(p + "Book").value), "—"); $(p + "Vol").value = t.volume || ""; cascade(p, "—");
   $(p + "Chap").value = t.chapter ? String(t.chapter) : ""; cascade(p, "—");
   $(p + "Sec").value = t.section || ""; $(p + "Topic").value = t.topic || ""; syncBook(p);
   $(p + "Type").value = t.type || ""; $(p + "Cat").value = t.category || ""; $(p + "Diff").value = t.difficulty || ""; $(p + "Num").value = t.number || "";
@@ -503,7 +562,7 @@ function readTags(p) {
 }
 // where a question sits in the tree, as filter values
 const locOf = (d) => isFree(d) ? { root: "free", topic: d.topic || "", vol: "", chap: "", sec: "" }
-  : { root: "ndm", topic: "", vol: d.volume || "", chap: d.chapter ? String(d.chapter) : "", sec: d.section || "" };
+  : { root: rootOf(d), topic: "", vol: d.volume || "", chap: d.chapter ? String(d.chapter) : "", sec: d.section || "" };
 function chapTitle(vol, n) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(n)); return c ? c.title : ""; }
 function secTitle(vol, n, s) { const c = (TOC[vol] || []).find((c) => String(c.n) === String(n)); const x = c && c.sections.find((z) => z[0] === s); return x ? x[1] : ""; }
 const plain = (lines) => (lines || []).join(" ").replace(/\\[a-zA-Z]+|[${}^_]/g, " ").replace(/\s+/g, " ").trim();
@@ -515,7 +574,7 @@ try { openKeys = new Set(JSON.parse(localStorage.getItem("tb_open") || "[]")); }
 function saveOpen() { try { localStorage.setItem("tb_open", JSON.stringify([...openKeys])); } catch (e) {} }
 try { if (!localStorage.getItem("tb_open2")) { openKeys.add("r:ndm"); localStorage.setItem("tb_open2", "1"); saveOpen(); } } catch (e) {}
 let lastReveal = null;
-function setLoc(v, c, s) { B.f.root = v ? "ndm" : ""; B.f.topic = ""; B.f.vol = v; B.f.chap = c; B.f.sec = s; applyFilters(null); }
+function setLoc(v, c, s) { B.f.root = v ? (isHle(v) ? "hle" : "ndm") : ""; B.f.topic = ""; B.f.vol = v; B.f.chap = c; B.f.sec = s; applyFilters(null); }
 function setRoot(r) { B.f.root = r; B.f.topic = ""; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
 function setTopic(t) { B.f.root = "free"; B.f.topic = t; B.f.vol = ""; B.f.chap = ""; B.f.sec = ""; applyFilters(null); }
 // a question is named by its type and the number the teacher gave it: "Example 4", "Exercise 3a"
@@ -525,7 +584,7 @@ const qName = (d) => typeWord(d) + (d.number ? " " + d.number : "");
 const typeRank = (d) => d.type === "Worked example" ? 0 : d.type === "Exercise" ? 1 : d.type === "Discussion" ? 2 : d.type === "Quiz" ? 3 : 4;
 const natCmp = (x, y) => String(x ?? "").localeCompare(String(y ?? ""), undefined, { numeric: true });
 function cmpQ(a, b) {
-  return (isFree(a) - isFree(b)) || natCmp(a.volume, b.volume) || natCmp(a.chapter, b.chapter) || natCmp(a.section, b.section) || natCmp(a.topic, b.topic) ||
+  return (isFree(a) - isFree(b)) || String(rootOf(a)).localeCompare(rootOf(b)) || natCmp(a.volume, b.volume) || natCmp(a.chapter, b.chapter) || natCmp(a.section, b.section) || natCmp(a.topic, b.topic) ||
     (typeRank(a) - typeRank(b)) || (!a.number - !b.number) || natCmp(a.number, b.number) || ((a.createdAt || 0) - (b.createdAt || 0));
 }
 // drag a question onto a branch to move it, or onto another question to replace it
@@ -564,12 +623,12 @@ function renderTree(o) {
   if (o && o.id && o.id !== lastReveal) {
     lastReveal = o.id;
     if (isFree(o)) { openKeys.add("r:free"); openKeys.add("t:" + (o.topic || "")); saveOpen(); }
-    else if (o.volume) { openKeys.add("r:ndm"); openKeys.add("v:" + o.volume); openKeys.add(`c:${o.volume}:${o.chapter}`); openKeys.add(`s:${o.volume}:${o.section}`); saveOpen(); }
+    else if (o.volume) { openKeys.add("r:" + rootOf(o)); openKeys.add("v:" + o.volume); openKeys.add(`c:${o.volume}:${o.chapter}`); openKeys.add(`s:${o.volume}:${o.section}`); saveOpen(); }
   }
   const auto = new Set();
   if (searching) for (const d of pool) {
     if (isFree(d)) { auto.add("r:free"); auto.add("t:" + (d.topic || "")); }
-    else { auto.add("r:ndm"); auto.add("v:" + d.volume); auto.add(`c:${d.volume}:${d.chapter}`); auto.add(`s:${d.volume}:${d.section}`); }
+    else { auto.add("r:" + rootOf(d)); auto.add("v:" + d.volume); auto.add(`c:${d.volume}:${d.chapter}`); auto.add(`s:${d.volume}:${d.section}`); }
   }
   const all = document.createElement("button"); all.type = "button"; all.className = "node" + (!f.root && !f.vol ? " sel" : "");
   all.innerHTML = '<span class="t"></span><span class="cnt"></span>'; all.firstChild.textContent = "All questions"; all.lastChild.textContent = pool.length;
@@ -613,30 +672,36 @@ function renderTree(o) {
     }
     return box;
   };
-  const freePool = pool.filter(isFree), ndmPool = pool.filter((d) => !isFree(d));
-  const rootNdm = node("r:ndm", "New Discovering Mathematics", ndmPool.length, f.root === "ndm" && !f.vol, () => setRoot("ndm"));
-  for (const v of Object.keys(TOC)) {
-    const inV = (d) => !isFree(d) && d.volume === v;
-    const dv = node("v:" + v, "Book " + v, count(inV), f.vol === v && !f.chap, () => setLoc(v, "", ""), { book: "NDM", volume: v, chapter: "", section: "", topic: "" });
-    for (const ch of TOC[v]) {
-      const cn = String(ch.n), inC = (d) => inV(d) && String(d.chapter) === cn;
-      const dc = node(`c:${v}:${cn}`, `${cn} ${ch.title}`, count(inC), f.vol === v && f.chap === cn && !f.sec, () => setLoc(v, cn, ""), { book: "NDM", volume: v, chapter: Number(cn), section: "", topic: "" });
-      for (const [sn, st] of ch.sections) {
-        const inS = (d) => inC(d) && d.section === sn;
-        const qs = pool.filter(inS);
-        const ds = node(`s:${v}:${sn}`, `${sn} ${st}`, qs.length, f.vol === v && f.sec === sn, () => setLoc(v, cn, sn), { book: "NDM", volume: v, chapter: Number(cn), section: sn, topic: "" });
-        if (qs.length) ds.append(leaves(qs));
-        dc.append(ds);
+  const freePool = pool.filter(isFree);
+  const bookRoot = (rootKey, label, bookCode, bpool, vols) => {
+    const rootB = node("r:" + rootKey, label, bpool.length, f.root === rootKey && !f.vol, () => setRoot(rootKey));
+    for (const v of vols) {
+      const inV = (d) => !isFree(d) && d.volume === v;
+      const dv = node("v:" + v, volLabel(v), count(inV), f.vol === v && !f.chap, () => setLoc(v, "", ""), { book: bookCode, volume: v, chapter: "", section: "", topic: "" });
+      for (const ch of TOC[v]) {
+        const cn = String(ch.n), inC = (d) => inV(d) && String(d.chapter) === cn;
+        const dc = node(`c:${v}:${cn}`, `${cn} ${ch.title}`, count(inC), f.vol === v && f.chap === cn && !f.sec, () => setLoc(v, cn, ""), { book: bookCode, volume: v, chapter: Number(cn), section: "", topic: "" });
+        for (const [sn, st] of ch.sections) {
+          const inS = (d) => inC(d) && d.section === sn;
+          const qs = pool.filter(inS);
+          const ds = node(`s:${v}:${sn}`, `${sn} ${st}`, qs.length, f.vol === v && f.sec === sn, () => setLoc(v, cn, sn), { book: bookCode, volume: v, chapter: Number(cn), section: sn, topic: "" });
+          if (qs.length) ds.append(leaves(qs));
+          dc.append(ds);
+        }
+        const loose = pool.filter((d) => inC(d) && !ch.sections.some((s) => s[0] === d.section));
+        if (loose.length) { const dl = node(`s:${v}:${cn}:none`, "No section", loose.length, false, () => setLoc(v, cn, "")); dl.append(leaves(loose)); dc.append(dl); }
+        dv.append(dc);
       }
-      const loose = pool.filter((d) => inC(d) && !ch.sections.some((s) => s[0] === d.section));
-      if (loose.length) { const dl = node(`s:${v}:${cn}:none`, "No section", loose.length, false, () => setLoc(v, cn, "")); dl.append(leaves(loose)); dc.append(dl); }
-      dv.append(dc);
+      rootB.append(dv);
     }
-    rootNdm.append(dv);
-  }
-  const unfiled = ndmPool.filter((d) => !TOC[d.volume] || !TOC[d.volume].some((c) => String(c.n) === String(d.chapter)));
-  if (unfiled.length) { const du = node("v:none", "Not filed", unfiled.length, false, () => setRoot("ndm")); du.append(leaves(unfiled)); rootNdm.append(du); }
+    const unfiled = bpool.filter((d) => !TOC[d.volume] || !TOC[d.volume].some((c) => String(c.n) === String(d.chapter)));
+    if (unfiled.length) { const du = node("v:none:" + rootKey, "Not filed", unfiled.length, false, () => setRoot(rootKey)); du.append(leaves(unfiled)); rootB.append(du); }
+    return rootB;
+  };
+  const ndmPool = pool.filter((d) => !isFree(d) && d.book !== "HLE"), hlePool = pool.filter((d) => d.book === "HLE");
+  const rootNdm = bookRoot("ndm", "New Discovering Mathematics", "NDM", ndmPool, Object.keys(TOC).filter((v) => !isHle(v)));
   tree.append(rootNdm);
+  tree.append(bookRoot("hle", "國中翰林版", "HLE", hlePool, Object.keys(TOC).filter(isHle)));
   // not tied to a textbook: four areas of mathematics
   const rootFree = node("r:free", "Not tied to a textbook", freePool.length, f.root === "free" && !f.topic, () => setRoot("free"));
   for (const t of TOPICS) {
@@ -850,7 +915,7 @@ function render() {
   $("editBar").hidden = !canWrite; $("newBtn").hidden = !canWrite; if (typeof refreshAdmin === "function") refreshAdmin(); // readers (students) can browse and make their own variants, not add or change questions
   renderTabs();
   { // where this question sits: book, chapter, section, name and number
-    const parts = !o || !o.id ? [] : isFree(o) ? [o.topic || "Not tied to a textbook"] : [o.volume ? "Book " + o.volume : "", o.chapter ? "Ch " + o.chapter : "", o.section || ""];
+    const parts = !o || !o.id ? [] : isFree(o) ? [o.topic || "Not tied to a textbook"] : [o.volume ? volLabel(o.volume) : "", o.chapter ? "Ch " + o.chapter : "", o.section || ""];
     const items = o && o.id ? [...parts, qName(o)].filter(Boolean) : (o && o.example ? ["Example"] : []);
     const box = $("locTag"); box.textContent = "";
     items.forEach((t, k) => {
@@ -860,6 +925,8 @@ function render() {
     box.title = items.join(" · ");
     const tc = $("tagChips"); tc.textContent = "";
     if (o && o.id) [o.difficulty, o.category].filter(Boolean).forEach(t => { const c = document.createElement("span"); c.className = "tagtxt"; c.textContent = t; tc.append(c); });
+    { const rt = (o && (o.rating || (o.thumbDown ? "down" : o.thumbUp ? "up" : ""))) || ""; for (const [id, v] of [["rUp", "up"], ["rDown", "down"]]) { const b = $(id); b.classList.toggle("on", rt === v); b.setAttribute("aria-pressed", String(rt === v)); b.disabled = !(o && o.id && db && canWrite); } }
+    { const has = !!(o && o.comment && o.comment.length); $("bCom").textContent = has ? "Comment \u25CF" : "Comment"; $("bCom").disabled = !(o && o.id); if (comKey !== (o && o.id)) { S.comment = false; S.kk = false; S.ks = false; comKey = o && o.id; } }
   }
   $("bAns").disabled = !q; $("bExp").disabled = !q;
   $("bAns").classList.toggle("v", isVar); $("bExp").classList.toggle("v", isVar);
@@ -868,7 +935,7 @@ function render() {
     const qt = $("qText"); qt.textContent = "";
     const p = document.createElement("p"); p.className = "empty";
     p.textContent = !B.loaded && db ? "Loading the question bank…" : "No questions match these filters. Change a filter, or add one with New question.";
-    qt.append(p); showFigure(""); paintAnswer(); return;
+    qt.append(p); showFigure(""); paintAnswer(); paintComment(); paintExtra(); return;
   }
   const pk = (o && o.id || "x") + ":" + S.vi;
   if (pk !== lastPartKey) { lastPartKey = pk; S.part = 0; }
@@ -882,9 +949,18 @@ function render() {
     if (pv.split) { $("partPrev").disabled = pv.i <= 0; $("partNext").disabled = pv.i >= pv.n - 1; }
     $("partToggle").textContent = pv.split ? "Show all parts" : "One part at a time";
   }
-  paintAnswer();
+  paintAnswer(); paintComment(); paintExtra();
 }
-let lastPartKey = null;
+let lastPartKey = null, comKey = null;
+function paintComment() {
+  const o = S.orig, card = $("comCard");
+  if (!S.comment || !o || !o.id) { card.hidden = true; return; }
+  const lines = o.comment && o.comment.length ? o.comment : ["(No comment yet. Press Edit to write one.)"];
+  renderLines($("comBody"), lines);
+  card.hidden = false;
+}
+$("bCom").onclick = () => { S.comment = !S.comment; if (S.comment) { S.answer = false; paintAnswer(); } paintComment(); };
+$("comClose").onclick = () => { S.comment = false; paintComment(); };
 $("partPrev").onclick = () => { S.part = Math.max(0, S.part - 1); render(); };
 $("partNext").onclick = () => { S.part += 1; render(); };
 $("partToggle").onclick = () => { const q = cur(); if (!q) return; S.split = !partView(q).split; S.part = 0; render(); };
@@ -941,7 +1017,7 @@ async function autoFig(q) {
   } catch (e) { q.figs_checked = true; /* silent: skipped this visit */ }
   finally { clearTimeout(stopT); clearInterval(tm); figBusy = false; btn.disabled = false; render(); }
 }
-$("bAns").onclick = () => { S.answer = !S.answer; paintAnswer(); };
+$("bAns").onclick = () => { S.answer = !S.answer; if (S.answer) { S.comment = false; paintComment(); } paintAnswer(); };
 
 /* ---------------- Claude ---------------- */
 let sample = null, imgLimits = null, ctl = null, db = null, canWrite = false;
@@ -1020,7 +1096,7 @@ $("stopBtn").onclick = () => ctl && ctl.abort();
 /* ---------------- input view ---------------- */
 function openInput(on) { $("editBar").hidden = on || !canWrite; $("inputView").hidden = !on; $("teachView").hidden = on; $("dock").hidden = on; $("topRow").hidden = on; $("side").hidden = on; if (on) $("qInput").focus(); }
 $("newBtn").onclick = () => {
-  setTags("in", { book: B.f.root === "free" ? "FREE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, difficulty: B.f.diff, number: "" });
+  setTags("in", { book: B.f.root === "free" ? "FREE" : B.f.root === "hle" ? "HLE" : "NDM", topic: B.f.topic, volume: B.f.vol, chapter: B.f.chap, section: B.f.sec, type: B.f.type, category: B.f.cat, difficulty: B.f.diff, number: "" });
   openInput(true);
 };
 $("backBtn").onclick = () => openInput(false);
@@ -1094,7 +1170,7 @@ function nonLoc(d) {
 }
 function matches(d) {
   const f = B.f;
-  return nonLoc(d) && (!f.root || (f.root === "free") === isFree(d)) && (!f.topic || d.topic === f.topic) &&
+  return nonLoc(d) && (!f.root || f.root === rootOf(d)) && (!f.topic || d.topic === f.topic) &&
     (!f.vol || d.volume === f.vol) && (!f.chap || String(d.chapter) === f.chap) && (!f.sec || d.section === f.sec);
 }
 const stuVar = {};
@@ -1157,6 +1233,7 @@ for (const id of ["edQ", "edA"]) $(id).addEventListener("input", () => { clearTi
 $("tagBtn").onclick = () => {
   const o = S.orig; if (!o || !o.id) return;
   setTags("ed", o);
+  $("edCom").value = (o.comment || []).join("\n"); $("edKK").value = (o.keyKnowledge || []).join("\n"); $("edKS").value = (o.keySteps || []).join("\n");
   $("edQ").value = (o.question || []).join("\n"); $("edA").value = (o.answer || []).join("\n"); $("edS").value = (o.solution || []).join("\n");
   $("edFigWrap").hidden = $("edRedraw").hidden = !o.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(o.figure_svg);
   $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagStatus").textContent = "";
@@ -1222,7 +1299,7 @@ $("tagSave").onclick = async () => {
   $("tagStatus").className = "status"; $("tagStatus").textContent = ""; $("edReview").hidden = true;
   const question = toLines($("edQ").value);
   if (!question.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question can't be empty."; return; }
-  const rec = { ...readTags("ed"), question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
+  const rec = { ...readTags("ed"), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
   // only a change to the wording of the question (or its diagram) can make the answer and solution wrong; tags and typos in the answer cannot be judged here
   const same = (a, b) => JSON.stringify((a || []).map((x) => String(x).trim())) === JSON.stringify((b || []).map((x) => String(x).trim()));
   // a diagram only redrawn in a new style (same content) does not call the answer into question
@@ -1536,6 +1613,73 @@ Students see the new version one or two minutes after that.`;
   } catch (e) { if (e && e.code === "declined") return; toast("Couldn't save bank.json. Try again."); }
 };
 
+
+// floating "Top" button in the contents column: appears after scrolling down, jumps back to the settings, filters and book choice
+(function () {
+  const side = document.getElementById("side"), b = document.getElementById("sideTop");
+  if (!side || !b) return;
+  const upd = () => { b.hidden = side.scrollTop < 160; };
+  side.addEventListener("scroll", upd, { passive: true });
+  b.addEventListener("click", () => { side.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); });
+  upd();
+})();
+
+// Filter fold: shows how many of Scenario / Competency / Level are set, and opens itself when one is
+(function () {
+  const fold = document.getElementById("filterFold"), cnt = document.getElementById("fCount");
+  if (!fold || !cnt) return;
+  const ids = ["fType", "fCat", "fDiff"];
+  let seen = false;
+  const upd = () => {
+    const n = ids.filter((id) => { const e = document.getElementById(id); return e && e.value; }).length;
+    cnt.hidden = !n; cnt.textContent = n + " active";
+    if (n && !seen) { fold.open = true; }
+    if (n) seen = true;
+  };
+  for (const id of ids) { const e = document.getElementById(id); if (e) e.addEventListener("change", upd); }
+  setInterval(upd, 1000); upd();
+})();
+
+// rating: 👍 / 👎 in the question's attribute row. Nothing lit = no opinion (default); click the lit one again to clear.
+(function () {
+  for (const [id, v] of [["rUp", "up"], ["rDown", "down"]]) {
+    const b = document.getElementById(id); if (!b) continue;
+    b.onclick = async () => {
+      const o = S.orig; if (!o || !o.id || !db || !canWrite) return;
+      const cur = o.rating || (o.thumbDown ? "down" : o.thumbUp ? "up" : "");
+      const next = cur === v ? "" : v;
+      o.rating = next; o.thumbUp = false; o.thumbDown = false; render();
+      try { await db.doc("bank/" + o.id).update({ rating: next, thumbUp: false, thumbDown: false }); }
+      catch (e) { o.rating = cur; render(); toast("Couldn't save the rating. Try again."); }
+    };
+  }
+})();
+
+// Key Knowledge and Key Steps: two more teaching panels (also in the Reader). Empty until the teacher writes them in Edit.
+S.kk = false; S.ks = false;
+function paintExtra() {
+  const o = S.orig;
+  for (const [flag, card, body, btn, field, label] of [["kk", "kkCard", "kkBody", "bKK", "keyKnowledge", "Key Knowledge"], ["ks", "ksCard", "ksBody", "bKS", "keySteps", "Key Steps"]]) {
+    const lines = (o && o[field]) || [];
+    $(btn).textContent = lines.length ? label + " \u25CF" : label; $(btn).disabled = !(o && o.id);
+    const c = $(card);
+    if (!S[flag] || !o || !o.id) { c.hidden = true; continue; }
+    renderLines($(body), lines.length ? lines : [canWrite ? "(Nothing here yet. Press Edit to add it.)" : "(Nothing here yet.)"]);
+    c.hidden = false;
+  }
+}
+function openPanel(which) {
+  const was = { ans: S.answer, com: S.comment, kk: S.kk, ks: S.ks }[which];
+  S.answer = false; S.comment = false; S.kk = false; S.ks = false;
+  if (which === "ans") S.answer = !was; else if (which === "com") S.comment = !was; else S[which] = !was;
+  paintAnswer(); paintComment(); paintExtra();
+}
+$("bAns").onclick = () => openPanel("ans");
+$("bCom").onclick = () => openPanel("com");
+$("bKK").onclick = () => openPanel("kk");
+$("bKS").onclick = () => openPanel("ks");
+$("kkClose").onclick = () => { S.kk = false; paintExtra(); };
+$("ksClose").onclick = () => { S.ks = false; paintExtra(); };
 </script>
 
 </html>
