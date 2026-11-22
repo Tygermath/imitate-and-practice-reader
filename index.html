@@ -130,6 +130,8 @@ mjx-assistive-mml { position: absolute !important; clip: rect(1px, 1px, 1px, 1px
 .btn.v { border-color: var(--variant); color: var(--variant); }
 .btn.v.fill { background: var(--variant); color: var(--chalk-ink); }
 .btn:disabled { opacity: .38; cursor: not-allowed; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+a.btn[hidden] { display: none; }
 .btn:not(:disabled):hover { transform: translateY(-1px); }
 
 /* filter row (question bank) */
@@ -397,6 +399,7 @@ body:not(.rv) .rv-only { display: none !important; }
     <button class="btn" id="bAns" type="button">Answer</button>
     <button class="btn" id="bKK" type="button">Key Knowledge</button>
     <button class="btn" id="bKS" type="button">Key Steps</button>
+    <a class="btn" id="bPS" target="_blank" rel="noopener" hidden title="Open the strategy lesson for this question in Problem Solver">解題策略</a>
     <button class="btn v fill" id="bVar" type="button">Variant</button>
     <span class="rate studio-only" id="rateBox" role="group" aria-label="Rating"><button type="button" id="rUp" aria-pressed="false" title="Good (click again to clear)" aria-label="Thumbs up">&#128077;</button><button type="button" id="rDown" aria-pressed="false" title="Needs work (click again to clear)" aria-label="Thumbs down">&#128078;</button></span>
     <button class="btn studio-only" id="bCom" type="button">Comment</button>
@@ -420,6 +423,7 @@ body:not(.rv) .rv-only { display: none !important; }
       <label class="check" id="edFigWrap"><input type="checkbox" id="edFig" checked> Keep the diagram</label>
       <button class="ghost" id="edRedraw" type="button">Redraw the diagram (graphs on grid paper)</button>
       <label class="check"><input type="checkbox" id="edCheck" checked> After saving, check that the answer and solution still match</label>
+      <label class="check"><input type="checkbox" id="edSolver"> Problem Solver has a strategy lesson for this question (shows the 解題策略 button)</label>
       <p class="note" style="margin:0">Start a part with its label, e.g. (a) or (i). Write maths between dollar signs, e.g. $\frac{3}{4}x^2$; type a money sign as \$.</p>
     </div>
     <div class="preview" aria-live="polite"><span class="plabel">PREVIEW</span><div class="qtext" id="edPrevQ"></div><div class="afigs" id="edFigPrev"></div><div class="ans" id="edPrevA"></div></div>
@@ -1236,6 +1240,7 @@ $("tagBtn").onclick = () => {
   $("edCom").value = (o.comment || []).join("\n"); $("edKK").value = (o.keyKnowledge || []).join("\n"); $("edKS").value = (o.keySteps || []).join("\n");
   $("edQ").value = (o.question || []).join("\n"); $("edA").value = (o.answer || []).join("\n"); $("edS").value = (o.solution || []).join("\n");
   $("edFigWrap").hidden = $("edRedraw").hidden = !o.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(o.figure_svg);
+  $("edSolver").checked = !!o.solver;
   $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagStatus").textContent = "";
   $("tagModal").hidden = false; editPreview(); $("edQ").focus();
 };
@@ -1299,7 +1304,7 @@ $("tagSave").onclick = async () => {
   $("tagStatus").className = "status"; $("tagStatus").textContent = ""; $("edReview").hidden = true;
   const question = toLines($("edQ").value);
   if (!question.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question can't be empty."; return; }
-  const rec = { ...readTags("ed"), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
+  const rec = { ...readTags("ed"), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), solver: $("edSolver").checked, question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
   // only a change to the wording of the question (or its diagram) can make the answer and solution wrong; tags and typos in the answer cannot be judged here
   const same = (a, b) => JSON.stringify((a || []).map((x) => String(x).trim())) === JSON.stringify((b || []).map((x) => String(x).trim()));
   // a diagram only redrawn in a new style (same content) does not call the answer into question
@@ -1657,8 +1662,13 @@ Students see the new version one or two minutes after that.`;
 
 // Key Knowledge and Key Steps: two more teaching panels (also in the Reader). Empty until the teacher writes them in Edit.
 S.kk = false; S.ks = false;
+// 解題策略: the question's strategy lesson in Problem Solver, found there by this question's id
+const PS_URL = "https://polya-coach.brucemath.workers.dev/";
 function paintExtra() {
   const o = S.orig;
+  const ps = $("bPS");
+  ps.hidden = !(o && o.id && o.solver);
+  if (!ps.hidden) ps.href = PS_URL + "#ip=" + encodeURIComponent(o.id);
   for (const [flag, card, body, btn, field, label] of [["kk", "kkCard", "kkBody", "bKK", "keyKnowledge", "Key Knowledge"], ["ks", "ksCard", "ksBody", "bKS", "keySteps", "Key Steps"]]) {
     const lines = (o && o[field]) || [];
     $(btn).textContent = lines.length ? label + " \u25CF" : label; $(btn).disabled = !(o && o.id);
