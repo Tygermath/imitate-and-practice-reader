@@ -237,6 +237,13 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .status.err { color: var(--danger); }
 
 /* busy overlay */
+.tab.m { border-style: dashed; }
+.ask { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 78%, transparent); z-index: 21; }
+.ask .box { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 20px 22px; display: grid; gap: 10px; width: min(560px, calc(100% - 32px)); }
+.ask h3 { margin: 0; font-size: 17px; }
+.ask p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ask textarea { width: 100%; font: inherit; font-size: 15px; padding: 9px 11px; border: 2px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); resize: vertical; min-height: 96px; }
+.ask .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .busy { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 78%, transparent); z-index: 20; }
 .busy .box { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 22px 26px; display: grid; gap: 12px; justify-items: center; min-width: 260px; max-width: calc(100% - 32px); }
 .spin { width: 34px; height: 34px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--chalk); animation: s 1s linear infinite; }
@@ -261,7 +268,7 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .loc .sec { font-size: 19px; color: var(--ink); }
 .loc { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; flex: none; }
 @media (max-width: 640px) { .loc { display: none; } }
-body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bExp { display: none !important; }
+body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bMod, body.rv #bExp { display: none !important; }
 body:not(.rv) .rv-only { display: none !important; }
 /* floating button: jump back to the top of the (long) contents column */
 .sideTop { position: sticky; bottom: 12px; align-self: flex-end; margin-top: -8px; flex: none; z-index: 5; display: inline-flex; align-items: center; gap: 6px;
@@ -293,7 +300,7 @@ body:not(.rv) .rv-only { display: none !important; }
 .dock .rate button.on { border-color: var(--chalk); }
 .dock .rate button#rDown.on { border-color: var(--variant); }
 [hidden] { display: none !important; }
-#editBar, #newBtn, #tagBtn, #delBtn, #settingsRow, #bVar, #bExp, #bCom, #comCard, #rateBox, .studio-only { display: none !important; }
+#editBar, #newBtn, #tagBtn, #delBtn, #settingsRow, #bVar, #bMod, #bExp, #bCom, #comCard, #rateBox, .studio-only { display: none !important; }
 </style>
 
 <div id="app">
@@ -401,12 +408,20 @@ body:not(.rv) .rv-only { display: none !important; }
     <button class="btn" id="bKS" type="button">Key Steps</button>
     <a class="btn" id="bPS" target="_blank" rel="noopener" hidden title="Open the strategy lesson for this question in Problem Solver">解題策略</a>
     <button class="btn v fill" id="bVar" type="button">Variant</button>
+    <button class="btn v" id="bMod" type="button" title="Change the question in a bigger way, as you describe it (not just the numbers)">Modify</button>
+    <button class="btn v" id="bLang" type="button" hidden title="Show this question in the other language">&#20013;&#25991;</button>
     <span class="rate studio-only" id="rateBox" role="group" aria-label="Rating"><button type="button" id="rUp" aria-pressed="false" title="Good (click again to clear)" aria-label="Thumbs up">&#128077;</button><button type="button" id="rDown" aria-pressed="false" title="Needs work (click again to clear)" aria-label="Thumbs down">&#128078;</button></span>
     <button class="btn studio-only" id="bCom" type="button">Comment</button>
   </nav>
   </div>
 </div>
 
+<div class="ask" id="modAsk" hidden role="dialog" aria-modal="true" aria-labelledby="modTitle"><div class="box">
+  <h3 id="modTitle">Modify this question</h3>
+  <p>Describe how the question should change. Claude rewrites the question, its diagram, the answer and the solution. A Variant only changes numbers; Modify changes the question itself.</p>
+  <textarea id="modText" placeholder="e.g. Make the centres of symmetry of the two cubes coincide, and ask for the three orthogonal views."></textarea>
+  <div class="row"><button class="btn" id="modCancel" type="button">Cancel</button><button class="btn v fill" id="modGo" type="button">Modify</button></div>
+</div></div>
 <div class="busy" id="busy" hidden><div class="box"><div class="spin" aria-hidden="true"></div><div id="busyText">Working…</div><button class="ghost" id="stopBtn" type="button">Stop</button></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="modal" id="tagModal" hidden><div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="tagHead">
@@ -491,7 +506,14 @@ S.vi = -1; S.answer = false;
 S.part = 0;      // which part is on screen when a long question is split
 S.split = null;  // null = decide by length, true/false = the teacher's choice
 const MAXV = 3;
-const cur = () => S.vi < 0 ? S.orig : S.variants[S.vi];
+// S.vi: -1 = Original, 0..2 = Variant 1..3, MOD0.. = Modified 1..3 (a bigger change the teacher described).
+// S.tr: show the stored translation (record.tr) of the question on screen, when it has one.
+const MAXM = 3, MOD0 = 10;
+S.mods = []; S.tr = false;
+const raw = () => S.vi < 0 ? S.orig : S.vi >= MOD0 ? S.mods[S.vi - MOD0] : S.variants[S.vi];
+const cur = () => { const r = raw(); return r && r.tr && S.tr ? { ...r, ...r.tr, figure_svg: r.tr.figure_svg || r.figure_svg, figs_checked: true } : r; };
+const viewName = () => S.vi < 0 ? "ORIGINAL" : S.vi >= MOD0 ? `MODIFIED ${S.vi - MOD0 + 1}` : `VARIANT ${S.vi + 1}`;
+const isZh = (x) => { const t = ((x && x.question) || []).join(" ").replace(/\$[^$]*\$/g, ""); const c = (t.match(/[一-鿿]/g) || []).length; return c >= 2 && c >= t.replace(/\s/g, "").length * 0.15; };
 
 /* ---------------- textbook contents (New Discovering Mathematics) ---------------- */
 // volumes, chapters and sections as listed in the STAR Publishing NDM e-books (Books 1-4)
@@ -867,12 +889,13 @@ function renderTabs() {
   const box = $("vTabs"); box.textContent = "";
   if (!S.orig) return;
   const mk = (label, vi) => {
-    const b = document.createElement("button"); b.type = "button"; b.className = "tab" + (vi >= 0 ? " v" : "") + (S.vi === vi ? " cur" : ""); b.textContent = label;
+    const b = document.createElement("button"); b.type = "button"; b.className = "tab" + (vi >= 0 ? " v" : "") + (vi >= MOD0 ? " m" : "") + (S.vi === vi ? " cur" : ""); b.textContent = label;
     if (S.vi === vi) b.setAttribute("aria-current", "true");
     b.onclick = () => { S.vi = vi; render(); }; box.append(b);
   };
   mk(S.orig.example ? "Original (example)" : "Original", -1);
   S.variants.forEach((_, i) => mk("Variant " + (i + 1), i));
+  S.mods.forEach((m, i) => mk("Modified " + (i + 1), MOD0 + i));
 }
 let ansKey = null, afUrls = [];
 // drawings that are part of the answer (a histogram, a graph …) are shown under the answer lines
@@ -891,7 +914,7 @@ function paintAnswer() {
   if (!S.answer || !q) { card.hidden = true; ansKey = null; return; }
   card.classList.toggle("variant", S.vi >= 0);
   const pv = partView(q);
-  $("ansTitle").textContent = (S.vi < 0 ? "ORIGINAL" : `VARIANT ${S.vi + 1}`) + (pv.split ? ` · PART ${pv.i + 1} OF ${pv.n}` : "") + " · ANSWER";
+  $("ansTitle").textContent = viewName() + (pv.split ? ` · PART ${pv.i + 1} OF ${pv.n}` : "") + " · ANSWER";
   // the figure for the answer is drawn automatically, once per question; the button only appears as a retry after a failure
   if (!figBusy) $("figBtn").hidden = true; // no error buttons: a failed check is simply skipped
   if (sample && !rv && !figBusy && !(q.answer_figures || []).length && !q.figs_checked) {
@@ -907,7 +930,8 @@ function paintAnswer() {
   card.hidden = false;
 }
 function render() {
-  if (S.vi >= S.variants.length) S.vi = S.variants.length - 1;
+  if (S.vi >= MOD0) { if (S.vi - MOD0 >= S.mods.length) S.vi = S.mods.length ? MOD0 + S.mods.length - 1 : S.variants.length - 1; }
+  else if (S.vi >= S.variants.length) S.vi = S.variants.length - 1;
   const q = cur();
   const isVar = S.vi >= 0;
   const o = S.orig;
@@ -935,6 +959,9 @@ function render() {
   $("bAns").disabled = !q; $("bExp").disabled = !q;
   $("bAns").classList.toggle("v", isVar); $("bExp").classList.toggle("v", isVar);
   $("bVar").disabled = !o || !sample;
+  $("bMod").disabled = !o || !sample;
+  { const r = raw(), lb = $("bLang"), zh = !!r && isZh(S.tr && r.tr ? r.tr : r);   // the button names the language you would switch TO
+    lb.textContent = zh ? "English" : "\u4e2d\u6587"; lb.hidden = !r || !(sample || r.tr); lb.classList.toggle("fill", !!(S.tr && r && r.tr)); }
   if (!q) {
     const qt = $("qText"); qt.textContent = "";
     const p = document.createElement("p"); p.className = "empty";
@@ -1015,7 +1042,7 @@ async function autoFig(q) {
     const figs = await genFigs(q, ac.signal);
     q.answer_figures = figs; q.figs_checked = true; ansKey = null;
     if (o && o.id && db && canWrite) {
-      try { await db.doc("bank/" + o.id).update(S.vi < 0 ? { answer_figures: figs, figs_checked: true } : { variants: S.variants }); }
+      try { await persistView({ answer_figures: figs, figs_checked: true }); }
       catch (e) { /* the figure is on screen; it is saved the next time */ }
     }
   } catch (e) { q.figs_checked = true; /* silent: skipped this visit */ }
@@ -1184,8 +1211,8 @@ function showIndex(i) {
   B.idx = d ? i : -1;
   // the variants a question has made are stored with it, so they are there again next time
   if (!canWrite && S.orig && S.orig.id && !same) stuVar[S.orig.id] = S.variants; // a reader's own variants stay for this visit only
-  if (same) { S.orig = d; if (Array.isArray(d.variants)) S.variants = d.variants.slice(-MAXV); }
-  else { S.orig = d; S.variants = d && !canWrite && stuVar[d.id] ? stuVar[d.id] : d && Array.isArray(d.variants) ? d.variants.slice(-MAXV) : []; S.vi = -1; S.answer = false; }
+  if (same) { S.orig = d; if (Array.isArray(d.variants)) S.variants = d.variants.slice(-MAXV); if (Array.isArray(d.mods)) S.mods = d.mods.slice(-MAXM); }
+  else { S.orig = d; S.variants = d && !canWrite && stuVar[d.id] ? stuVar[d.id] : d && Array.isArray(d.variants) ? d.variants.slice(-MAXV) : []; S.mods = d && Array.isArray(d.mods) ? d.mods.slice(-MAXM) : []; S.tr = false; S.vi = -1; S.answer = false; }
   if (!d && !B.all.length && !db) S.orig = EXAMPLE;
   save(); render();
 }
@@ -1225,7 +1252,7 @@ async function addToBank(rec) {
       return;
     } catch (e) { toast(e && e.code === "quota_exceeded" ? "The question bank is full. Delete some questions first." : "Couldn't save to the bank. The question is shown but not saved."); }
   } else toast("The question bank isn't available here, so this question is shown but not saved.");
-  S.orig = rec; S.variants = []; S.vi = -1; S.answer = false; render();
+  S.orig = rec; S.variants = []; S.mods = []; S.tr = false; S.vi = -1; S.answer = false; render();
 }
 function initFilterValues() { $("fType").value = B.f.type || ""; $("fCat").value = B.f.cat || ""; $("fDiff").value = B.f.diff || ""; $("fSearch").value = B.f.q || ""; }
 
@@ -1368,11 +1395,34 @@ async function loadStatic() {
   try { const user = await window.claude?.use?.("user"); const w = user ? await user.can("data.write") : null; canWrite = w !== false; } catch (e) { canWrite = true; }
   render();
   const slow = setTimeout(() => { if (!B.loaded) toast("The question bank can't be reached yet."); }, 10000);
-  db.collection("bank").orderBy("createdAt").limit(1000).onSnapshot((snap) => {
-    if (!snap.metadata.fromCache) { clearTimeout(slow); B.loaded = true; }
-    B.all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    applyFilters((S.orig && S.orig.id) || B.lastId);
-  }, () => { clearTimeout(slow); B.loaded = true; applyFilters(null); toast("The question bank stopped responding. Reload the page to reconnect."); });
+  // one query returns at most 1000 questions, so read the bank in windows ordered by createdAt: each window starts at
+  // the last question of the one before, and a new window opens whenever the last one is full (overlaps merge by id)
+  const W = []; let want = B.lastId, failed = false;
+  const merge = () => {
+    const m = new Map(); for (const w of W) for (const d of w.docs) m.set(d.id, d);
+    B.all = [...m.values()];
+    const done = W.every((w) => w.ready) && W[W.length - 1].docs.length < 1000;
+    if (want && (done || m.has(want))) { const k = want; want = null; applyFilters(k); return; }
+    applyFilters((S.orig && S.orig.id) || want);
+  };
+  const openWindow = (from) => {
+    const w = { docs: [], ready: false, from };
+    W.push(w);
+    let q = db.collection("bank");
+    if (from != null) q = q.where("createdAt", ">=", from);
+    q.orderBy("createdAt").limit(1000).onSnapshot((snap) => {
+      if (!snap.metadata.fromCache) { w.ready = true; if (W[0] === w) { clearTimeout(slow); B.loaded = true; } }
+      w.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const lastAt = w.docs.length >= 1000 ? w.docs[w.docs.length - 1].createdAt : null;
+      if (w === W[W.length - 1] && lastAt != null && lastAt !== from && W.length < 25) openWindow(lastAt);
+      merge();
+    }, () => {
+      clearTimeout(slow); B.loaded = true; w.ready = true;
+      if (!failed) { failed = true; toast("The question bank stopped responding. Reload the page to reconnect."); }
+      merge();
+    });
+  };
+  openWindow(null);
 })();
 function variantPrompt(base, existing) {
   const seen = existing.map((v) => v.question.join(" ")).join("\n---\n");
@@ -1400,6 +1450,76 @@ $("bVar").onclick = async () => {
       try { await db.doc("bank/" + base.id).update({ variants: keep }); }
       catch (e) { toast("The variant is on screen but couldn't be saved with the question."); }
     }
+  } catch (e) { if (e.code !== "cancelled") toast(codeMsg(e)); }
+  finally { busy(false); }
+};
+
+// saves whatever is on screen with its question: the original's own fields, or the Variant / Modified list it belongs to
+async function persistView(forOrig) {
+  const o = S.orig; if (!(o && o.id && db && canWrite)) return;
+  await db.doc("bank/" + o.id).update(S.vi < 0 ? (forOrig || {}) : S.vi >= MOD0 ? { mods: S.mods } : { variants: S.variants });
+}
+
+/* ---------------- Modify: a bigger change to the question, as the teacher describes it ---------------- */
+function modifyPrompt(base, note) {
+  return `Here is a maths question with its diagram, answer and solution, as JSON:
+${JSON.stringify({ question: base.question, figure_svg: base.figure_svg, answer: base.answer, solution: base.solution })}
+
+The teacher wants this question MODIFIED (a real change to the question, not just new numbers) as follows:
+>>> ${note}
+<<< (end of the teacher's request)
+
+Rewrite the question so that it follows the teacher's request exactly. Keep everything the teacher did not mention (context, wording, numbers, labels, style, units). Redraw "figure_svg" so that it shows the MODIFIED situation correctly: if the request changes the geometry (positions, alignment, symmetry, dimensions), the new picture must really show it, with valid geometry. If the modified question asks the student to draw something (orthogonal views, a graph, a net, a construction), put those drawings in "answer_figures": work out every dimension and coordinate first, then draw each requested drawing accurately and to scale, one entry per drawing, with "part" matching the label used in "answer". Remove sub-questions that no longer make sense and add those the teacher asks for. Recompute the answer and the full worked solution from scratch for the modified question and check them.
+Variety key: ${Math.random().toString(36).slice(2, 8)}
+${FORMAT}`;
+}
+$("bMod").onclick = () => { if (!sample || !raw()) return; $("modAsk").hidden = false; $("modText").focus(); };
+$("modCancel").onclick = () => { $("modAsk").hidden = true; };
+$("modText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("modGo").click(); if (e.key === "Escape") $("modCancel").click(); });
+$("modGo").onclick = async () => {
+  const note = $("modText").value.trim(), base = raw();
+  if (!sample || !base) return;
+  if (!note) { toast("Describe how the question should change."); return; }
+  $("modAsk").hidden = true;
+  const full = S.mods.length >= MAXM;
+  if (full) toast("You can keep 3 modified questions. Modified 1 will be deleted, and 2 and 3 become 1 and 2.");
+  ctl = new AbortController(); busy(true, "Claude is modifying the question… drawings can take a minute or two.");
+  try {
+    const d = valid(await sample.json(modifyPrompt(base, note), { signal: ctl.signal, modelTier: "complex", cache: false }));
+    if (!d) throw { code: "invalid_json" };
+    d.instruction = note; d.from = viewName().toLowerCase();
+    const keep = [...S.mods, d].slice(-MAXM);
+    S.mods = keep; S.vi = MOD0 + keep.length - 1; S.tr = false; S.answer = false; render();
+    if (S.orig && S.orig.id && db && canWrite) {
+      try { await db.doc("bank/" + S.orig.id).update({ mods: keep }); $("modText").value = ""; }
+      catch (e) { toast("The modified question is on screen but couldn't be saved with the question."); }
+    } else $("modText").value = "";
+  } catch (e) { if (e.code !== "cancelled") toast(codeMsg(e)); $("modAsk").hidden = false; }
+  finally { busy(false); }
+};
+
+/* ---------------- 中文 / Eng: the same question in the other language ---------------- */
+function translatePrompt(r, to) {
+  const lang = to === "zh" ? "Traditional Chinese as written in Taiwan, using standard mathematics textbook terms" : "English (British spelling, textbook style)";
+  return `Here is a maths question with its diagram, answer and worked solution, as JSON:
+${JSON.stringify({ question: r.question, figure_svg: r.figure_svg, answer: r.answer, solution: r.solution })}
+
+Translate it into ${lang}. Keep the same number of lines in "question", "answer" and "solution", in the same order. Keep sub-question labels such as "(a)" and "(i)", all numbers, units and every LaTeX expression between dollar signs exactly as they are: a mathematical expression is never translated (words inside \\text{} may be). Do not solve, shorten, explain or change anything.
+"figure_svg": if the SVG contains words in the source language, return the same SVG with only those words translated (keep every coordinate; for Chinese use font-family "Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif"). If it has only letters, numbers and symbols, return "".
+Reply with ONLY one JSON object, no other text: {"question": [string, ...], "answer": [string, ...], "solution": [string, ...], "figure_svg": string}`;
+}
+$("bLang").onclick = async () => {
+  const r = raw(); if (!r) return;
+  if (r.tr) { S.tr = !S.tr; render(); return; }   // already translated: switch between the two
+  if (!sample) return;
+  const to = isZh(r) ? "en" : "zh";
+  ctl = new AbortController(); busy(true, to === "zh" ? "Claude is translating into Chinese…" : "Claude is translating into English…");
+  try {
+    const t = await sample.json(translatePrompt(r, to), { signal: ctl.signal, modelTier: "default", cache: false });
+    if (!t || !Array.isArray(t.question) || !t.question.length || !Array.isArray(t.answer) || !Array.isArray(t.solution)) throw { code: "invalid_json" };
+    r.tr = { lang: to, question: t.question.map(String), answer: t.answer.map(String), solution: t.solution.map(String), figure_svg: typeof t.figure_svg === "string" ? t.figure_svg : "" };
+    S.tr = true; ansKey = null; render();
+    try { await persistView({ tr: r.tr }); } catch (e) { toast("The translation is on screen but couldn't be saved with the question."); }
   } catch (e) { if (e.code !== "cancelled") toast(codeMsg(e)); }
   finally { busy(false); }
 };
@@ -1507,7 +1627,7 @@ function stamp() { const d = new Date(), p = (n) => String(n).padStart(2, "0"); 
 async function exportDoc() {
   const q = cur();
   if (!q) return;
-  const name = S.vi < 0 ? "Original" : `Variant ${S.vi + 1}`;
+  const name = S.vi < 0 ? "Original" : S.vi >= MOD0 ? `Modified ${S.vi - MOD0 + 1}` : `Variant ${S.vi + 1}`;
   busy(true, "Creating the Word file…"); $("stopBtn").hidden = true;
   try {
     const blob = await buildDocx(q, name);
