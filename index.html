@@ -406,7 +406,7 @@ body:not(.rv) .rv-only { display: none !important; }
     <button class="btn" id="bAns" type="button">Answer</button>
     <button class="btn" id="bKK" type="button">Key Knowledge</button>
     <button class="btn" id="bKS" type="button">Key Steps</button>
-    <a class="btn" id="bPS" target="_blank" rel="noopener" hidden title="Open the strategy lesson for this question in Problem Solver">解題策略</a>
+    <a class="btn" id="bPS" target="_blank" rel="noopener" hidden title="Open the strategy lesson for this question in Way Finder">解題策略</a>
     <button class="btn v fill" id="bVar" type="button">Variant</button>
     <button class="btn v" id="bMod" type="button" title="Change the question in a bigger way, as you describe it (not just the numbers)">Modify</button>
     <button class="btn v" id="bLang" type="button" hidden title="Show this question in the other language">&#20013;&#25991;</button>
@@ -437,19 +437,27 @@ body:not(.rv) .rv-only { display: none !important; }
       <label class="field"><span>COMMENT · ONE LINE PER PARAGRAPH · SHOWN ONLY IN STUDIO</span><textarea id="edCom" rows="3"></textarea></label>
       <label class="check" id="edFigWrap"><input type="checkbox" id="edFig" checked> Keep the diagram</label>
       <button class="ghost" id="edRedraw" type="button">Redraw the diagram (graphs on grid paper)</button>
-      <label class="check"><input type="checkbox" id="edCheck" checked> After saving, check that the answer and solution still match</label>
-      <label class="check"><input type="checkbox" id="edSolver"> Problem Solver has a strategy lesson for this question (shows the 解題策略 button)</label>
+      <label class="check"><input type="checkbox" id="edCheck" checked> Before saving, review the wording and solve the question again</label>
+      <label class="check"><input type="checkbox" id="edSolver"> Way Finder has a strategy lesson for this question (shows the 解題策略 button)</label>
       <p class="note" style="margin:0">Start a part with its label, e.g. (a) or (i). Write maths between dollar signs, e.g. $\frac{3}{4}x^2$; type a money sign as \$.</p>
     </div>
     <div class="preview" aria-live="polite"><span class="plabel">PREVIEW</span><div class="qtext" id="edPrevQ"></div><div class="afigs" id="edFigPrev"></div><div class="ans" id="edPrevA"></div></div>
   </div>
   <div class="review" id="edReview" hidden>
     <h3 id="edRevHead"></h3>
+    <p class="note" id="edRevNotes" style="margin:0"></p>
     <div class="editCols">
-      <div class="editFields"><span class="plabel">CURRENT ANSWER AND SOLUTION</span><div class="ans" id="edRevOld"></div></div>
-      <div class="editFields"><span class="plabel">SUGGESTED FOR THE EDITED QUESTION</span><div class="ans" id="edRevNew"></div></div>
+      <div class="editFields"><span class="plabel">YOUR QUESTION</span><div class="ans" id="edRevOldQ"></div></div>
+      <label class="field"><span>QUESTION AFTER REVIEW · CHANGE IT IF NEEDED</span><textarea id="rvQ" rows="6"></textarea></label>
     </div>
-    <div class="row"><button class="btn v fill" id="revUse" type="button">Use the suggested answer and solution</button><button class="ghost" id="revKeep" type="button">Keep the current ones</button><button class="ghost" id="revBack" type="button">Back to editing</button></div>
+    <div class="editCols">
+      <div class="editFields"><span class="plabel">OLD ANSWER AND SOLUTION</span><div class="ans" id="edRevOld"></div></div>
+      <div class="editFields">
+        <label class="field"><span>NEW ANSWER · ONE PART PER LINE</span><textarea id="rvA" rows="3"></textarea></label>
+        <label class="field"><span>NEW SOLUTION · ONE STEP PER LINE</span><textarea id="rvS" rows="6"></textarea></label>
+      </div>
+    </div>
+    <div class="row"><button class="btn v fill" id="revUse" type="button">Confirm and save</button><button class="ghost" id="revRegen" type="button">I changed the question: solve it again</button><button class="ghost" id="revBack" type="button">Back to editing</button></div>
   </div>
   <div class="row"><button class="btn fill" id="tagSave" type="button">Save changes</button><button class="ghost" id="tagCancel" type="button">Cancel</button>
     <span class="spacer"></span><button class="ghost danger" id="tagDel" type="button">Delete question</button></div>
@@ -1263,12 +1271,18 @@ function editPreview() { renderLines($("edPrevQ"), toLines($("edQ").value)); ren
 for (const id of ["edQ", "edA"]) $(id).addEventListener("input", () => { clearTimeout(pvT); pvT = setTimeout(editPreview, 400); });
 $("tagBtn").onclick = () => {
   const o = S.orig; if (!o || !o.id) return;
+  const rr = raw(), trMode = !!(rr && rr.tr && S.tr), t = trMode ? rr.tr : rr;
+  edCtx = { locked: S.vi >= 0 || trMode, t, rr, trMode, vi: S.vi };
   setTags("ed", o);
+  for (const el of $("edTagGrid").querySelectorAll("select,input")) el.disabled = edCtx.locked;
+  if (!edCtx.locked) cascade("ed", "—");
+  $("tagHead").textContent = edCtx.locked || S.vi >= 0 ? "Edit · " + viewName() + (trMode ? " · " + (rr.tr.lang === "zh" ? "中文" : "English") : "") : "Edit question";
   $("edCom").value = (o.comment || []).join("\n"); $("edKK").value = (o.keyKnowledge || []).join("\n"); $("edKS").value = (o.keySteps || []).join("\n");
-  $("edQ").value = (o.question || []).join("\n"); $("edA").value = (o.answer || []).join("\n"); $("edS").value = (o.solution || []).join("\n");
-  $("edFigWrap").hidden = $("edRedraw").hidden = !o.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(o.figure_svg);
+  $("edQ").value = (t.question || []).join("\n"); $("edA").value = (t.answer || []).join("\n"); $("edS").value = (t.solution || []).join("\n");
+  $("edFigWrap").hidden = $("edRedraw").hidden = !t.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(t.figure_svg);
   $("edSolver").checked = !!o.solver;
-  $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagStatus").textContent = "";
+  $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagDel").hidden = edCtx.locked; $("tagStatus").className = "status";
+  $("tagStatus").textContent = edCtx.locked ? "Book, volume, chapter, section, scenario, competency, level and number are shared by every version of the question, so they can only be changed on the Original. Everything else can be edited here." : "";
   $("tagModal").hidden = false; editPreview(); $("edQ").focus();
 };
 $("tagCancel").onclick = () => { $("tagModal").hidden = true; };
@@ -1283,7 +1297,7 @@ function paintEdFig(svg) {
 }
 $("edRedraw").onclick = async () => {
   const o = S.orig; if (!o || !o.id || !sample) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "Claude isn't available here, so the diagram can't be redrawn."; return; }
-  const cur = edFigNew || o.figure_svg;
+  const cur = edFigNew || edCtx.t.figure_svg;
   const prompt = `Redraw this diagram from a maths question, keeping exactly the same content: the same shapes or data, the same numbers, labels and scale. Only improve how it is drawn.
 Question:
 ${toLines($("edQ").value).join("\n")}
@@ -1321,60 +1335,86 @@ $("delBtn").onclick = async () => {
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("tagModal").hidden) $("tagModal").hidden = true; });
 async function persistEdit(id, rec, msg) {
   $("tagSave").disabled = true;
-  try { await db.doc("bank/" + id).update({ ...rec, updatedAt: Date.now() }); $("tagModal").hidden = true; $("edReview").hidden = true; toast(msg || "Question updated"); }
+  try { const b = edBuild(rec); await db.doc("bank/" + id).update({ ...b.doc, updatedAt: Date.now() }); b.apply(); $("tagModal").hidden = true; $("edReview").hidden = true; toast(msg || "Question updated"); if (edCtx && edCtx.locked) { ansKey = null; render(); } }
   catch (e) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "Couldn't save the changes. Try again."; }
   finally { $("tagSave").disabled = false; }
 }
-let pendingEdit = null;
+let pendingEdit = null, edCtx = null;
+// what to write when Edit was opened on a Variant, a Modified question or a translation: only that version changes; comment, key knowledge, key steps and the solver flag belong to the question itself
+function edBuild(rec) {
+  const c = edCtx;
+  if (!c || !c.locked) return { doc: rec, apply() {} };
+  const SH = ["comment", "keyKnowledge", "keySteps", "solver"], shared = {}, own = {};
+  for (const k in rec) (SH.includes(k) ? shared : own)[k] = rec[k];
+  const nt = { ...c.t, ...own };
+  const o = S.orig;
+  if (c.vi < 0) return { doc: { ...shared, tr: nt }, apply() { Object.assign(o, shared); o.tr = nt; } };
+  const isMod = c.vi >= MOD0, arr = isMod ? S.mods : S.variants, i = isMod ? c.vi - MOD0 : c.vi;
+  const el = c.trMode ? { ...c.rr, tr: nt } : nt;
+  const na = arr.map((x, j) => j === i ? el : x);
+  return { doc: { ...shared, [isMod ? "mods" : "variants"]: na }, apply() { Object.assign(o, shared); if (isMod) S.mods = na; else S.variants = na; } };
+}
 $("tagSave").onclick = async () => {
   const o = S.orig, id = o && o.id; if (!id) return;
+  const t = edCtx.t;
   $("tagStatus").className = "status"; $("tagStatus").textContent = ""; $("edReview").hidden = true;
   const question = toLines($("edQ").value);
   if (!question.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question can't be empty."; return; }
-  const rec = { ...readTags("ed"), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), solver: $("edSolver").checked, question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || o.figure_svg || "") : "" };
+  const rec = { ...(edCtx.locked ? {} : readTags("ed")), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), solver: $("edSolver").checked, question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || t.figure_svg || "") : "" };
   // only a change to the wording of the question (or its diagram) can make the answer and solution wrong; tags and typos in the answer cannot be judged here
   const same = (a, b) => JSON.stringify((a || []).map((x) => String(x).trim())) === JSON.stringify((b || []).map((x) => String(x).trim()));
   // a diagram only redrawn in a new style (same content) does not call the answer into question
-  const changed = !same(question, o.question) || (!edFigNew && rec.figure_svg !== (o.figure_svg || ""));
-  if (!changed || !$("edCheck").checked || !sample) { await persistEdit(id, rec, changed && !sample ? "Saved. The answer wasn't re-checked because Claude isn't available here." : "Question updated"); return; }
-  const prompt = `A teacher edited a maths question. Decide whether the stored answer and worked solution still fit the EDITED question.
+  const changed = !same(question, t.question) || (!edFigNew && rec.figure_svg !== (t.figure_svg || ""));
+  if (!changed || !$("edCheck").checked || !sample) { await persistEdit(id, rec, changed && !sample ? "Saved. The answer wasn't re-solved because Claude isn't available here." : "Question updated"); return; }
+  await runEditReview(id, rec);
+};
+// before saving an edited question: Claude suggests better wording (Chinese in an English question is translated) and works out the answer again; the editor changes what is needed and confirms
+async function runEditReview(id, rec) {
+  const question = rec.question;
+  const prompt = `A teacher edited a maths question and is about to save it. Do three things for the EDITED question below.
 Edited question (one paragraph or part per line):
 ${question.join("\n")}
-${rec.figure_svg ? "\nThe diagram currently stored with it (SVG):\n" + rec.figure_svg + "\n" : ""}
-Stored answer:
-${rec.answer.join("\n")}
-
-Stored solution:
-${rec.solution.join("\n")}
-
-Solve the EDITED question yourself from scratch, then compare with the stored answer and solution. Treat a changed number, quantity, condition or sub-question as a real change; ignore differences that are only wording, spacing or LaTeX style.
+${rec.figure_svg ? "\nThe diagram stored with it (SVG):\n" + rec.figure_svg + "\n" : ""}
+1. WORDING. Improve the wording of the question only where it needs it: clear, correct, natural textbook style, with the same meaning, numbers, labels and sub-questions. If the question is written in English but contains any Chinese (words or punctuation), translate that into English. If the whole question is written in Chinese, keep it in Chinese. Never change the mathematics.
+2. ANSWER. Solve the question (with your improved wording) yourself from scratch and write the correct answer and a worked solution. Do not copy the old ones: the teacher changed the question, so they may be out of date. The old ones, for reference only:
+Old answer: ${rec.answer.join(" | ")}
+Old solution: ${rec.solution.join(" | ")}
+3. NOTES. A short list, in English, of what you changed in the wording and why (an empty list if nothing needed changing).
 Reply with ONLY one JSON object, no other text:
-{"matches": true or false, "reason": "one short sentence saying what differs, or that everything still fits", "answer": [string, ...], "solution": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
-- "answer_figures": the drawings that belong to the correct answer of the EDITED question (histogram, graph, number line, net … that the question asks for), drawn accurately from its data as ${SVG_RULES} "part" is the part's label as in "answer", or "". Use [] if the answer needs no drawing.
-- "answer" and "solution": the correct answer and worked solution for the edited question. If "matches" is true, repeat the stored ones unchanged. One string per part (answer) or per short step (solution), each part starting with its label such as "(a)". Write every mathematical expression in LaTeX between single dollar signs; a literal money sign is \\\\$.
+{"question": [string, ...], "notes": [string, ...], "answer": [string, ...], "solution": [string, ...], "figure_svg": string, "figure_grid": object or null, "answer_figures": [{"part": string, "svg": string, "grid": object or null}, ...]}
+- "question": the improved question, one string per paragraph or part, each part starting with its label such as "(a)". Write every mathematical expression in LaTeX between single dollar signs; a literal money sign is \\\\$.
+- "answer_figures": the drawings that belong to the correct answer of the question (histogram, graph, number line, net … that the question asks for), drawn accurately from its data as ${SVG_RULES} "part" is the part's label as in "answer", or "". Use [] if the answer needs no drawing.
+- "answer" and "solution": the correct answer and worked solution. One string per part (answer) or per short step (solution), each part starting with its label such as "(a)". Write a part's label only on the first line of that part. Same LaTeX rules as "question".
 - "figure_svg": "" if the diagram does not need to change. If the numbers or labels in the question no longer agree with the diagram, the full corrected diagram as one standalone SVG (same drawing rules as the stored one: white background, black strokes, dashed hidden edges, labels beside the right points or sides, no scripts).`;
-  ctl = new AbortController(); busy(true, "Claude is checking the answer and solution against your edit…");
+  ctl = new AbortController(); busy(true, "Claude is improving the wording and solving the edited question again… (about 30–60 seconds)");
   try {
     const r = await sample.json(prompt, { signal: ctl.signal, modelTier: "default", cache: false });
-    const na = (r.answer || []).map(String), ns = (r.solution || []).map(String);
+    const nq = (r.question || []).map(String).filter((x) => x.trim()), na = (r.answer || []).map(String), ns = (r.solution || []).map(String);
+    if (!nq.length || !na.length || !ns.length) throw { code: "invalid_json" };
     // a diagram the teacher just redrew (with its grid) or one that already has a grid is never replaced by the checker's gridless copy
     const keepFig = !!edFigNew || /data-grid=/.test(rec.figure_svg || "");
     const diag = !keepFig && typeof r.figure_svg === "string" && /<svg[\s>]/i.test(r.figure_svg) ? withGrid(r.figure_svg, r.figure_grid) : "";
-    if (r.matches === true && !diag) { await persistEdit(id, rec, "Question updated. The answer and solution still match."); return; }
-    if (!na.length || !ns.length) throw { code: "invalid_json" };
-    pendingEdit = { id, rec, answer: na, solution: ns, figure_svg: diag, answer_figures: cleanFigs(r.answer_figures) };
-    $("edRevHead").textContent = "The edit changes the question, so the answer and solution may be out of date. " + (r.reason ? String(r.reason) : "");
-    renderLines($("edRevOld"), [...rec.answer, ...dedupe(rec.solution)]);
-    renderLines($("edRevNew"), [...na, ...dedupe(ns)]);
-    $("revUse").textContent = diag ? "Use the suggested answer, solution and diagram" : "Use the suggested answer and solution";
+    pendingEdit = { id, rec, figure_svg: diag, answer_figures: cleanFigs(r.answer_figures) };
+    const notes = (r.notes || []).map(String).filter(Boolean);
+    $("edRevHead").textContent = "Review before saving. Claude suggested better wording and worked out the answer again. Change whatever is not right, then confirm.";
+    $("edRevNotes").textContent = notes.length ? "Wording changes: " + notes.join("  ·  ") : "No wording changes were suggested.";
+    renderLines($("edRevOldQ"), rec.question); renderLines($("edRevOld"), [...rec.answer, ...dedupe(rec.solution)]);
+    $("rvQ").value = nq.join("\n"); $("rvA").value = na.join("\n"); $("rvS").value = ns.join("\n");
+    $("revUse").textContent = diag ? "Confirm and save (with the corrected diagram)" : "Confirm and save";
     $("edReview").hidden = false; $("edReview").scrollIntoView({ block: "nearest" });
   } catch (e) {
     if (e && e.code === "cancelled") return;
-    $("tagStatus").className = "status err"; $("tagStatus").textContent = codeMsg(e) + " Nothing was saved. Press Save changes to try again, or untick the check box to save without it.";
+    $("tagStatus").className = "status err"; $("tagStatus").textContent = codeMsg(e) + " Nothing was saved. Press Save changes to try again, or untick the review box to save without it.";
   } finally { busy(false); }
+}
+$("revUse").onclick = () => {
+  const p = pendingEdit; if (!p) return;
+  const question = toLines($("rvQ").value), answer = toLines($("rvA").value), solution = toLines($("rvS").value);
+  if (!question.length || !answer.length || !solution.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question, answer and solution can't be empty."; return; }
+  persistEdit(p.id, { ...p.rec, question, answer, solution, figure_svg: p.rec.figure_svg && /data-grid=/.test(p.rec.figure_svg) ? p.rec.figure_svg : (p.figure_svg || p.rec.figure_svg), answer_figures: p.answer_figures, figs_checked: p.answer_figures.length > 0 }, "Question, answer and solution updated");
 };
-$("revUse").onclick = () => { const p = pendingEdit; if (p) persistEdit(p.id, { ...p.rec, answer: p.answer, solution: p.solution, figure_svg: p.rec.figure_svg && /data-grid=/.test(p.rec.figure_svg) ? p.rec.figure_svg : (p.figure_svg || p.rec.figure_svg), answer_figures: p.answer_figures, figs_checked: p.answer_figures.length > 0 },"Question, answer and solution updated"); };
-$("revKeep").onclick = () => { const p = pendingEdit; if (p) persistEdit(p.id, p.rec, "Question updated. The old answer and solution were kept."); };
+// the editor changed the suggested question: solve it again
+$("revRegen").onclick = () => { const p = pendingEdit; if (!p) return; const question = toLines($("rvQ").value); if (!question.length) return; runEditReview(p.id, { ...p.rec, question }); };
 $("revBack").onclick = () => { $("edReview").hidden = true; $("edQ").focus(); };
 $("tagDel").onclick = async () => {
   const id = S.orig && S.orig.id; if (!id) return;
@@ -1782,7 +1822,7 @@ Students see the new version one or two minutes after that.`;
 
 // Key Knowledge and Key Steps: two more teaching panels (also in the Reader). Empty until the teacher writes them in Edit.
 S.kk = false; S.ks = false;
-// 解題策略: the question's strategy lesson in Problem Solver, found there by this question's id
+// 解題策略: the question's strategy lesson in Way Finder, found there by this question's id
 const PS_URL = "https://polya-coach.brucemath.workers.dev/";
 function paintExtra() {
   const o = S.orig;
