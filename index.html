@@ -101,6 +101,12 @@ mjx-assistive-mml { position: absolute !important; clip: rect(1px, 1px, 1px, 1px
   max-height: 62%; overflow: auto; background: var(--card); border-radius: 14px; box-shadow: var(--shadow); border-top: 6px solid var(--chalk); padding: 14px 18px 16px; }
 .answer.variant { border-top-color: var(--variant); }
 .board { position: relative; }
+/* draggable divider between the question and the blank board: pull it down or up to give the answer or the question more room */
+.splitter { flex: none; height: 18px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; user-select: none; background: var(--paper); border-bottom: 1px solid var(--line); }
+.splitter::before { content: ""; width: 64px; height: 5px; border-radius: 3px; background: var(--line); }
+.splitter:hover::before, .splitter:focus-visible::before, .splitter.drag::before { background: var(--variant); }
+.splitter:focus-visible { outline: 2px solid var(--variant); outline-offset: -2px; }
+.question.sized { box-sizing: border-box; overflow: auto; max-height: calc(100% - 150px); }
 /* with the solution open, the card takes the whole blank area under the question */
 .answer.expanded { inset: 0; width: auto; max-height: none; border-radius: 0; box-shadow: none; box-sizing: border-box;
   padding: 16px max(24px, env(safe-area-inset-right, 0px)) 18px max(24px, env(safe-area-inset-left, 0px)); }
@@ -387,6 +393,7 @@ body:not(.rv) .rv-only { display: none !important; }
       <div class="qtext" id="qText"></div>
       <div class="qfig" id="qFig" hidden><img id="qFigImg" alt="Question diagram"></div>
     </div>
+    <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" tabindex="0" title="Drag up or down to change the space for the answer (double-click to reset)"></div>
     <div class="board" aria-label="Blank space for explaining">
       <div class="answer expanded" id="kkCard" hidden>
         <div class="head"><h3>KEY KNOWLEDGE</h3><span class="spacer"></span><button class="link" id="kkClose" type="button" aria-label="Close key knowledge">Close</button></div>
@@ -413,6 +420,7 @@ body:not(.rv) .rv-only { display: none !important; }
   </section>
 
   <nav class="dock" id="dock" aria-label="Teaching tools">
+    <a class="btn" id="bLab" target="_blank" rel="noopener" hidden title="Open the experiment for this question">Experiment</a>
     <button class="btn" id="bAns" type="button">Answer</button>
     <button class="btn" id="bKK" type="button">Key Knowledge</button>
     <button class="btn" id="bKS" type="button">Key Steps</button>
@@ -448,6 +456,7 @@ body:not(.rv) .rv-only { display: none !important; }
       <label class="check" id="edFigWrap"><input type="checkbox" id="edFig" checked> Keep the diagram</label>
       <button class="ghost" id="edRedraw" type="button">Redraw the diagram (graphs on grid paper)</button>
       <label class="check"><input type="checkbox" id="edCheck" checked> Before saving, review the wording and solve the question again</label>
+      <label class="field"><span>EXPERIMENT LINK · OPENS FROM THE "EXPERIMENT" BUTTON · LEAVE EMPTY FOR NO BUTTON</span><input type="text" id="edLab" placeholder="https://…" autocomplete="off" spellcheck="false"></label>
       <label class="check"><input type="checkbox" id="edSolver"> Way Finder has a strategy lesson for this question (shows the 解題策略 button)</label>
       <p class="note" style="margin:0">Start a part with its label, e.g. (a) or (i). Write maths between dollar signs, e.g. $\frac{3}{4}x^2$; type a money sign as \$.</p>
     </div>
@@ -1013,6 +1022,19 @@ $("comClose").onclick = () => { S.comment = false; paintComment(); };
 $("partPrev").onclick = () => { S.part = Math.max(0, S.part - 1); render(); };
 $("partNext").onclick = () => { S.part += 1; render(); };
 $("partToggle").onclick = () => { const q = cur(); if (!q) return; S.split = !partView(q).split; S.part = 0; render(); };
+(function () { // draggable divider between the question and the blank board
+  const sp = $("splitter"), qe = document.querySelector("#teachView .question"); if (!sp || !qe) return;
+  const apply = (h) => { if (!h) { qe.classList.remove("sized"); qe.style.height = ""; } else { qe.classList.add("sized"); qe.style.height = Math.max(60, Math.round(h)) + "px"; } };
+  const store = () => { try { const h = parseInt(qe.style.height, 10) || 0; h ? localStorage.setItem("tb_qh", String(h)) : localStorage.removeItem("tb_qh"); } catch (e) {} };
+  try { const s = parseInt(localStorage.getItem("tb_qh"), 10); if (s > 0) apply(s); } catch (e) {}
+  const H = () => qe.getBoundingClientRect().height;
+  let y0 = 0, h0 = 0, on = false;
+  const move = (e) => { if (on) apply(h0 + e.clientY - y0); };
+  const end = () => { if (!on) return; on = false; sp.classList.remove("drag"); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.removeEventListener("pointercancel", end); store(); };
+  sp.addEventListener("pointerdown", (e) => { on = true; y0 = e.clientY; h0 = H(); sp.classList.add("drag"); e.preventDefault(); window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); window.addEventListener("pointercancel", end); });
+  sp.addEventListener("dblclick", () => { apply(0); store(); });
+  sp.addEventListener("keydown", (e) => { if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return; e.preventDefault(); apply(H() + (e.key === "ArrowDown" ? 24 : -24)); store(); });
+})();
 $("solBtn").onclick = () => {
   const h = !$("solBody").hidden; $("solBody").hidden = h; $("solBtn").textContent = h ? "Show solution" : "Hide solution";
   $("ansCard").scrollTop = 0;
@@ -1290,7 +1312,7 @@ $("tagBtn").onclick = () => {
   $("edCom").value = (o.comment || []).join("\n"); $("edKK").value = (o.keyKnowledge || []).join("\n"); $("edKS").value = (o.keySteps || []).join("\n");
   $("edQ").value = (t.question || []).join("\n"); $("edA").value = (t.answer || []).join("\n"); $("edS").value = (t.solution || []).join("\n");
   $("edFigWrap").hidden = $("edRedraw").hidden = !t.figure_svg; $("edFig").checked = true; edFigNew = null; paintEdFig(t.figure_svg);
-  $("edSolver").checked = !!o.solver;
+  $("edSolver").checked = !!o.solver; $("edLab").value = o.expLink || "";
   $("tagDel").textContent = "Delete question"; $("tagDel").dataset.armed = ""; $("tagDel").hidden = edCtx.locked; $("tagStatus").className = "status";
   $("tagStatus").textContent = edCtx.locked ? "Book, volume, chapter, section, scenario, competency, level and number are shared by every version of the question, so they can only be changed on the Original. Everything else can be edited here." : "";
   $("tagModal").hidden = false; editPreview(); $("edQ").focus();
@@ -1354,7 +1376,7 @@ let pendingEdit = null, edCtx = null;
 function edBuild(rec) {
   const c = edCtx;
   if (!c || !c.locked) return { doc: rec, apply() {} };
-  const SH = ["comment", "keyKnowledge", "keySteps", "solver"], shared = {}, own = {};
+  const SH = ["comment", "keyKnowledge", "keySteps", "solver", "expLink"], shared = {}, own = {};
   for (const k in rec) (SH.includes(k) ? shared : own)[k] = rec[k];
   const nt = { ...c.t, ...own };
   const o = S.orig;
@@ -1370,7 +1392,7 @@ $("tagSave").onclick = async () => {
   $("tagStatus").className = "status"; $("tagStatus").textContent = ""; $("edReview").hidden = true;
   const question = toLines($("edQ").value);
   if (!question.length) { $("tagStatus").className = "status err"; $("tagStatus").textContent = "The question can't be empty."; return; }
-  const rec = { ...(edCtx.locked ? {} : readTags("ed")), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), solver: $("edSolver").checked, question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || t.figure_svg || "") : "" };
+  const rec = { ...(edCtx.locked ? {} : readTags("ed")), comment: toLines($("edCom").value), keyKnowledge: toLines($("edKK").value), keySteps: toLines($("edKS").value), solver: $("edSolver").checked, expLink: labUrl($("edLab").value), question, answer: toLines($("edA").value), solution: toLines($("edS").value), figure_svg: $("edFig").checked ? (edFigNew || t.figure_svg || "") : "" };
   // only a change to the wording of the question (or its diagram) can make the answer and solution wrong; tags and typos in the answer cannot be judged here
   const same = (a, b) => JSON.stringify((a || []).map((x) => String(x).trim())) === JSON.stringify((b || []).map((x) => String(x).trim()));
   // a diagram only redrawn in a new style (same content) does not call the answer into question
@@ -1865,11 +1887,15 @@ Students see the new version one or two minutes after that.`;
 S.kk = false; S.ks = false;
 // 解題策略: the question's strategy lesson in Way Finder, found there by this question's id
 const PS_URL = "https://polya-coach.brucemath.workers.dev/";
+// Experiment: a link typed in Edit; no link, no button
+function labUrl(v) { v = String(v || "").trim(); if (!v) return ""; if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = "https://" + v; return /^https?:\/\//i.test(v) ? v : ""; }
 function paintExtra() {
   const o = S.orig;
   const ps = $("bPS");
   ps.hidden = !(o && o.id && o.solver);
   if (!ps.hidden) ps.href = PS_URL + "#ip=" + encodeURIComponent(o.id);
+  const lab = $("bLab"), lu = o && o.id ? labUrl(o.expLink) : "";
+  lab.hidden = !lu; if (lu) lab.href = lu;
   for (const [flag, card, body, btn, field, label] of [["kk", "kkCard", "kkBody", "bKK", "keyKnowledge", "Key Knowledge"], ["ks", "ksCard", "ksBody", "bKS", "keySteps", "Key Steps"]]) {
     const lines = (o && o[field]) || [];
     $(btn).textContent = lines.length ? label + " \u25CF" : label; $(btn).disabled = !(o && o.id);
