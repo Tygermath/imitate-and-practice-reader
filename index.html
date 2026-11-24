@@ -1887,6 +1887,7 @@ Students see the new version one or two minutes after that.`;
 S.kk = false; S.ks = false;
 // 解題策略: the question's strategy lesson in Way Finder, found there by this question's id
 const PS_URL = "https://polya-coach.brucemath.workers.dev/";
+$("bLab").addEventListener("click", (e) => { if (!$("bLab").getAttribute("href")) { e.preventDefault(); const t = $("tagBtn"); if (t && !t.disabled) { t.click(); setTimeout(() => $("edLab").focus(), 50); } } });
 // Experiment: a link typed in Edit; no link, no button
 function labUrl(v) { v = String(v || "").trim(); if (!v) return ""; if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = "https://" + v; return /^https?:\/\//i.test(v) ? v : ""; }
 function paintExtra() {
@@ -1895,7 +1896,10 @@ function paintExtra() {
   ps.hidden = !(o && o.id && o.solver);
   if (!ps.hidden) ps.href = PS_URL + "#ip=" + encodeURIComponent(o.id);
   const lab = $("bLab"), lu = o && o.id ? labUrl(o.expLink) : "";
-  lab.hidden = !lu; if (lu) lab.href = lu;
+  const rdr = document.body.classList.contains("rv");
+  lab.hidden = rdr ? !lu : !(o && o.id);
+  if (lu) { lab.href = lu; lab.target = "_blank"; lab.title = "Open the experiment for this question"; lab.style.opacity = ""; }
+  else { lab.removeAttribute("href"); lab.removeAttribute("target"); lab.title = "No experiment link yet (only you see this button). Click to add one."; lab.style.opacity = ".6"; }
   for (const [flag, card, body, btn, field, label] of [["kk", "kkCard", "kkBody", "bKK", "keyKnowledge", "Key Knowledge"], ["ks", "ksCard", "ksBody", "bKS", "keySteps", "Key Steps"]]) {
     const lines = (o && o[field]) || [];
     $(btn).textContent = lines.length ? label + " \u25CF" : label; $(btn).disabled = !(o && o.id);
