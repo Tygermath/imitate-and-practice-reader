@@ -64,7 +64,10 @@ button:focus-visible, textarea:focus-visible, label.drop:focus-within { outline:
 .tab.v { color: var(--variant); border-color: var(--variant); }
 .tab.v.cur { background: var(--variant); color: var(--chalk-ink); }
 .dock { gap: 12px; }
-.dock .btn { min-width: 120px; font-size: 14px; padding: 7px 16px; }
+.dock .btn { min-width: 0; font-size: 14px; padding: 4px 14px; }
+.dock .btn.v { border-color: var(--chalk); color: var(--chalk); }
+.dock #bVar, .dock #bMod, .dock #bCom { border-color: var(--danger); color: var(--danger); }
+.dock #bVar.fill { background: var(--danger); color: var(--chalk-ink); }
 .spacer { flex: 1; }
 .ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); padding: 6px 12px; border-radius: 8px; }
 .ghost:hover { border-color: var(--chalk); color: var(--chalk); }
