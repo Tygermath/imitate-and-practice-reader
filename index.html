@@ -268,7 +268,14 @@ label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .loc .sec { font-size: 19px; color: var(--ink); }
 .loc { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; flex: none; }
 @media (max-width: 640px) { .loc { display: none; } }
-body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bMod, body.rv #bExp { display: none !important; }
+body.rv .studio-only, body.rv #editBar, body.rv #bVar, body.rv #bMod, body.rv #bExp, body.rv #expWrap { display: none !important; }
+/* Export: a small menu under the button, as .docx (what is on screen) or to WayFinder (the original question) */
+.expWrap { position: relative; display: inline-flex; }
+.expMenu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 26; min-width: 170px; display: grid; gap: 2px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.expMenu[hidden] { display: none; }
+.expMenu button, .expMenu a { display: block; text-align: left; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.expMenu button:hover, .expMenu a:hover, .expMenu button:focus-visible, .expMenu a:focus-visible { background: var(--orig-soft); color: var(--chalk); }
+.expMenu a[aria-disabled="true"] { opacity: .4; pointer-events: none; }
 body:not(.rv) .rv-only { display: none !important; }
 /* floating button: jump back to the top of the (long) contents column */
 .sideTop { position: sticky; bottom: 12px; align-self: flex-end; margin-top: -8px; flex: none; z-index: 5; display: inline-flex; align-items: center; gap: 6px;
@@ -309,9 +316,9 @@ body:not(.rv) .rv-only { display: none !important; }
     <div id="settingsRow" hidden>
       <button class="btn" id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
       <div id="settingsMenu" hidden>
-        <button class="btn studio-only" id="batchBtn" type="button">Prepare variants and figures for every question</button>
-        <button class="btn studio-only" id="syncBtn" type="button" title="Saves bank.json. Then ask Claude Code to sync the Reader site.">Sync Reader site</button>
         <button class="btn studio-only" id="viewBtn" type="button">Switch to Reader view</button>
+        <button class="btn studio-only" id="syncBtn" type="button" title="Saves bank.json. Then ask Claude Code to sync the Reader site.">Sync Reader site</button>
+        <button class="btn studio-only" id="batchBtn" type="button">Prepare 1 variant and figures for each question in Book 1, Ch 1-3</button>
         <button class="btn rv-only" id="linkBtn" type="button">Reader public link</button>
         <button class="btn rv-only fill" id="backStudio" type="button">← Back to Studio</button>
       </div>
@@ -334,7 +341,7 @@ body:not(.rv) .rv-only { display: none !important; }
     <button class="sideTop" id="sideTop" type="button" hidden aria-label="Back to the top of the contents">&#8593; Top</button>
   </aside>
   <div class="main">
-  <div class="editbar" id="editBar" hidden><button class="btn fill" id="newBtn" type="button">New</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button><button class="btn" id="bExp" type="button">Export</button></div>
+  <div class="editbar" id="editBar" hidden><button class="btn fill" id="newBtn" type="button">New</button><button class="btn" id="tagBtn" type="button" hidden>Edit</button><button class="btn danger" id="delBtn" type="button" hidden>Delete</button><span class="expWrap" id="expWrap"><button class="btn" id="bExp" type="button" aria-haspopup="true" aria-expanded="false">Export <span aria-hidden="true">&#9662;</span></button><div class="expMenu" id="expMenu" hidden role="menu"><button type="button" id="expDocx" role="menuitem">as .docx</button><a id="expWF" role="menuitem" target="_blank" rel="noopener">to WayFinder</a></div></span></div>
   <header class="top" id="topRow">
     <button class="ghost" id="sideBtn" type="button" aria-controls="side" aria-expanded="true">☰ Contents</button>
     <span class="loc" id="locTag"></span>
@@ -1681,17 +1688,48 @@ async function exportDoc() {
     toast(e && e.code === "unavailable" ? "Files can't be downloaded in this view." : "Couldn't create the Word file. Try again.");
   } finally { busy(false); $("stopBtn").hidden = false; }
 }
-$("bExp").onclick = () => exportDoc();
+// Export: [as .docx] saves what is on screen; [to WayFinder] opens the Way Finder Editor in a new tab with the ORIGINAL
+// question in the address (after #, so it never reaches a server and works before the Reader site is synced). Way Finder
+// shows it and waits for the teacher to press its analyse button; nothing is sent to Claude from here.
+const WF_EDITOR = "https://polya-coach.brucemath.workers.dev/editor";
+function b64url(s) {
+  const bytes = new TextEncoder().encode(s); let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function wfLink(o) {
+  const q = { id: o.id, book: o.book || "", volume: o.volume || "", chapter: o.chapter || "", section: o.section || "", number: o.number || "", type: o.type || "", topic: o.topic || "",
+    question: o.question || [], answer: o.answer || [], solution: o.solution || [], keyKnowledge: o.keyKnowledge || [], keySteps: o.keySteps || [], figure_svg: o.figure_svg || "" };
+  return WF_EDITOR + "#ipq=" + b64url(JSON.stringify(q));
+}
+function setExpMenu(open) { $("expMenu").hidden = !open; $("bExp").setAttribute("aria-expanded", String(open)); }
+$("bExp").onclick = (e) => {
+  e.stopPropagation();
+  const open = $("expMenu").hidden;
+  if (open) {
+    const o = S.orig, a = $("expWF"), ok = !!(o && o.id);
+    a.setAttribute("aria-disabled", String(!ok));
+    if (ok) a.href = wfLink(o); else a.removeAttribute("href");
+    a.title = ok ? "Opens the Way Finder Editor in a new tab with the original of this question. Sign in there, then press 分析並建立題目." : "Only questions saved in the bank can be sent.";
+  }
+  setExpMenu(open);
+};
+$("expDocx").onclick = () => { setExpMenu(false); exportDoc(); };
+$("expWF").onclick = () => { setTimeout(() => setExpMenu(false), 0); toast("Way Finder opens in a new tab. Sign in there, then press 分析並建立題目."); };
+document.addEventListener("click", (e) => { if (!$("expMenu").hidden && !e.target.closest("#expWrap")) setExpMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("expMenu").hidden) setExpMenu(false); });
 
 /* ---------------- studio only: batch variants and sync to the Reader site ---------------- */
 function refreshAdmin() {
   $("settingsRow").hidden = !((db && canWrite) || rv);
   const left = B.all.filter(needsPrep).length;
-  $("batchBtn").textContent = left ? `Prepare variants and figures for every question (${left} left)` : "All questions are ready (3 variants, figures drawn)";
+  $("batchBtn").textContent = left ? `Prepare 1 variant and figures for each question in Book 1, Ch 1-3 (${left} left)` : "Book 1, Ch 1-3 are ready (1 variant each, figures drawn)";
   $("batchBtn").disabled = !left || !sample || batchRun;
 }
 var batchRun = false;
-function needsPrep(d) { return !!d && !!d.id && ((d.variants || []).length < MAXV || needsFigs(d) || (d.variants || []).some(needsFigs)); }
+const BATCH_VARIANTS = 1;   // the batch makes this many variants per question
+const inBatchScope = (d) => d.book !== "HLE" && d.book !== "FREE" && String(d.volume) === "1" && [1, 2, 3].includes(Number(d.chapter));   // for now only NDM Book 1, Chapters 1-3
+function needsPrep(d) { return !!d && !!d.id && inBatchScope(d) && ((d.variants || []).length < BATCH_VARIANTS || needsFigs(d) || (d.variants || []).some(needsFigs)); }
 $("batchBtn").onclick = async () => {
   if (batchRun || !sample || !canWrite) return;
   const queue = B.all.filter(needsPrep);
@@ -1705,7 +1743,7 @@ $("batchBtn").onclick = async () => {
       const d = queue.shift();
       let vs = (d.variants || []).slice(0, MAXV);
       try {
-        while (vs.length < MAXV && !signal.aborted) {
+        while (vs.length < BATCH_VARIANTS && !signal.aborted) {
           const v = valid(await sample.json(variantPrompt(d, vs), { signal, modelTier: "default", cache: false }));
           if (!v) throw { code: "invalid_json" };
           vs = [...vs, v];
@@ -1722,14 +1760,14 @@ $("batchBtn").onclick = async () => {
           }
         }
         if (changed) { d.variants = vs; await db.doc("bank/" + d.id).update({ variants: vs, answer_figures: d.answer_figures || [], figs_checked: true }); }
-        if (vs.length >= MAXV) done++;
+        if (vs.length >= BATCH_VARIANTS) done++;
       } catch (e) { if (e && e.code === "cancelled") break; fail++; }
       show();
     }
   };
   await Promise.all([worker(), worker()]);
   batchRun = false; busy(false); ctl = null; applyFilters((S.orig && S.orig.id) || null);
-  toast(signal.aborted ? "Paused. Press the button again to continue." : fail ? `Finished, but ${fail} question(s) need another try: press the button again.` : "Every question has its 3 variants and figures.");
+  toast(signal.aborted ? "Paused. Press the button again to continue." : fail ? `Finished, but ${fail} question(s) need another try: press the button again.` : "Every question in Book 1, Ch 1-3 has its variant and figures.");
 };
 // Sync: save the whole bank as bank.json; the sync script (or Claude Code) then publishes it to the Reader site
 // preview the Reader as students see it (no editing, only Answer in the dock), and go back
