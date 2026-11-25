@@ -107,6 +107,13 @@ mjx-assistive-mml { position: absolute !important; clip: rect(1px, 1px, 1px, 1px
 .splitter:hover::before, .splitter:focus-visible::before, .splitter.drag::before { background: var(--variant); }
 .splitter:focus-visible { outline: 2px solid var(--variant); outline-offset: -2px; }
 .question.sized { box-sizing: border-box; overflow: auto; max-height: calc(100% - 150px); }
+/* no card open (only the question is shown): no divider and the question takes its natural height */
+#teachView.nocard .splitter { display: none; }
+#teachView.nocard .question.sized { height: auto !important; max-height: none; overflow: visible; }
+/* focus mode: side bar and the bars above and below are folded away; Esc brings them back */
+body.focus .side, body.focus #editBar, body.focus #topRow, body.focus #dock { display: none !important; }
+#focusExit { position: fixed; top: 8px; right: 12px; z-index: 30; opacity: .55; }
+#focusExit:hover, #focusExit:focus-visible { opacity: 1; }
 /* with the solution open, the card takes the whole blank area under the question */
 .answer.expanded { inset: 0; width: auto; max-height: none; border-radius: 0; box-shadow: none; box-sizing: border-box;
   padding: 16px max(24px, env(safe-area-inset-right, 0px)) 18px max(24px, env(safe-area-inset-left, 0px)); }
@@ -154,6 +161,7 @@ a.btn[hidden] { display: none; }
 .actions .btn { padding: 7px 14px; font-size: 14px; }
 .actions .btn.fill { grid-column: 1 / -1; }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn#bExp, .btn.v#bExp, .btn#tagBtn { border-color: var(--danger); color: var(--danger); }
 .sgroup { display: grid; gap: 10px; }
 .sgroup h2 { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .sgroup .field { flex: none; }
@@ -357,6 +365,7 @@ body:not(.rv) .rv-only { display: none !important; }
     <span class="chips" id="tagChips" style="flex:none"></span>
     <nav class="tabs" id="vTabs" aria-label="Original and variants"></nav>
     <span class="spacer"></span>
+    <button class="ghost" id="focusBtn" type="button" title="Hide the side bar and toolbars for the most reading and writing space (press Esc to bring them back)">&#9974; Focus</button>
     <span class="nav"><button class="ghost" id="prevQ" type="button" aria-label="Previous question">◀</button><span id="posQ">–</span><button class="ghost" id="nextQ" type="button" aria-label="Next question">▶</button></span>
   </header>
 
@@ -440,6 +449,7 @@ body:not(.rv) .rv-only { display: none !important; }
   <textarea id="modText" placeholder="e.g. Make the centres of symmetry of the two cubes coincide, and ask for the three orthogonal views."></textarea>
   <div class="row"><button class="btn" id="modCancel" type="button">Cancel</button><button class="btn v fill" id="modGo" type="button">Modify</button></div>
 </div></div>
+<button class="ghost" id="focusExit" type="button" hidden title="Show the toolbars again (Esc)">Esc &#10005;</button>
 <div class="busy" id="busy" hidden><div class="box"><div class="spin" aria-hidden="true"></div><div id="busyText">Working…</div><button class="ghost" id="stopBtn" type="button">Stop</button></div></div>
 <div class="toast" id="toast" hidden role="status"></div>
 <div class="modal" id="tagModal" hidden><div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="tagHead">
@@ -484,6 +494,7 @@ body:not(.rv) .rv-only { display: none !important; }
 </div></div>
 
 <div class="modal" id="qrModal" hidden><div class="sheet" style="width:min(420px,calc(100% - 32px));justify-items:center;text-align:center" role="dialog" aria-modal="true" aria-labelledby="qrHead"><h2 id="qrHead" style="margin:0;font-size:20px">Reader site: scan to open</h2><div id="qrBox" style="background:#fff;padding:12px;border-radius:12px;line-height:0"></div><a id="qrUrl" href="#" target="_blank" rel="noopener" style="word-break:break-all;font-size:14px"></a><span class="status" id="qrStatus"></span><div class="row"><button class="btn fill" id="qrCopy" type="button">Copy link</button><button class="ghost" id="qrClose" type="button">Close</button></div></div></div>
+<div class="modal" id="ovModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="ovHead"><h2 id="ovHead" style="margin:0;font-size:20px">Replace the variant?</h2><p id="ovText" style="margin:0;white-space:pre-line;line-height:1.55"></p><div class="row"><button class="btn fill" id="ovYes" type="button">Yes, export first</button><button class="btn" id="ovNo" type="button">No, just replace</button><button class="ghost" id="ovCancel" type="button">Cancel</button></div></div></div>
 <div class="modal" id="mvModal" hidden><div class="sheet" style="width:min(520px,calc(100% - 32px))" role="dialog" aria-modal="true" aria-labelledby="mvHead"><h2 id="mvHead" style="margin:0;font-size:20px"></h2><p id="mvText" style="margin:0;white-space:pre-line;line-height:1.55"></p><div class="row"><button class="btn fill" id="mvYes" type="button">OK</button></div></div></div>
 
 <script>
@@ -1035,6 +1046,25 @@ $("partToggle").onclick = () => { const q = cur(); if (!q) return; S.split = !pa
   sp.addEventListener("dblclick", () => { apply(0); store(); });
   sp.addEventListener("keydown", (e) => { if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return; e.preventDefault(); apply(H() + (e.key === "ArrowDown" ? 24 : -24)); store(); });
 })();
+// focus mode and the divider: the divider only shows while a card (answer, key knowledge, key steps, comment) is open
+function setFocus(on) {
+  document.body.classList.toggle("focus", on); $("focusExit").hidden = !on;
+  if (on) toast("Toolbars hidden. Press Esc to bring them back.");
+}
+$("focusBtn").onclick = () => setFocus(true);
+$("focusExit").onclick = () => setFocus(false);
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !document.body.classList.contains("focus")) return;
+  if (document.querySelector(".modal:not([hidden]), .ask:not([hidden]), .busy:not([hidden])") || !$("expMenu").hidden) return;
+  setFocus(false);
+});
+(function () {
+  const tv = $("teachView"), cards = ["ansCard", "kkCard", "ksCard", "comCard"].map((id) => $(id));
+  const sync = () => tv.classList.toggle("nocard", cards.every((c) => !c || c.hidden));
+  const mo = new MutationObserver(sync);
+  for (const c of cards) if (c) mo.observe(c, { attributes: true, attributeFilter: ["hidden"] });
+  sync();
+})();
 $("solBtn").onclick = () => {
   const h = !$("solBody").hidden; $("solBody").hidden = h; $("solBtn").textContent = h ? "Show solution" : "Hide solution";
   $("ansCard").scrollTop = 0;
@@ -1505,19 +1535,47 @@ Write ONE new variant of this question. Normally change ONLY the numbers (length
 ${seen ? "Use numbers different from these earlier variants:\n" + seen + "\n" : ""}Variety key: ${Math.random().toString(36).slice(2, 8)}
 ${FORMAT}`;
 }
+// Variant: one new variant per press. It replaces the variants the question already has; the teacher is asked first and can export them
+function askReplaceVariants() {
+  return new Promise((res) => {
+    const m = $("ovModal"), done = (v) => { m.hidden = true; res(v); };
+    $("ovText").textContent = `This question already has ${S.variants.length === 1 ? "a variant" : S.variants.length + " variants"}. A new variant will REPLACE ${S.variants.length === 1 ? "it" : "them"}.\n\nExport the current ${S.variants.length === 1 ? "variant" : "variants"} (Word file) before they are replaced?`;
+    $("ovYes").onclick = () => done("yes"); $("ovNo").onclick = () => done("no"); $("ovCancel").onclick = () => done("cancel");
+    m.hidden = false; $("ovYes").focus();
+  });
+}
+async function exportCurrentVariants() {
+  const dl = await window.claude?.use?.("downloads");
+  if (!dl) { toast("Files can't be downloaded in this view. Open this page on claude.ai."); return false; }
+  busy(true, "Creating the Word file…"); $("stopBtn").hidden = true;
+  try {
+    for (let i = 0; i < S.variants.length; i++) {
+      const name = "Variant " + (i + 1), blob = await buildDocx(S.variants[i], name);
+      busy(false);
+      await dl.save({ filename: `${name.replace(" ", "")}_${stamp()}.docx`, data: blob });
+      busy(true, "Creating the Word file…");
+    }
+    return true;
+  } catch (e) { if (!(e && e.code === "declined")) toast("Couldn't create the Word file. The variant was not replaced."); return false; }
+  finally { busy(false); $("stopBtn").hidden = false; }
+}
 $("bVar").onclick = async () => {
   if (!sample || !S.orig) return;
   const base = S.orig;
-  const full = S.variants.length >= MAXV;
-  if (full) toast("You can keep 3 variants. Variant 1 will be deleted, and Variants 2 and 3 become 1 and 2.");
-  const prompt = variantPrompt(base, S.variants);
-  ctl = new AbortController(); busy(true, full ? "Claude is writing a new variant… Variant 1 is deleted once it is ready." : "Claude is writing a variant…");
+  const old = S.variants.slice();
+  if (old.length) {
+    const a = await askReplaceVariants();
+    if (a === "cancel") return;
+    if (a === "yes" && !(await exportCurrentVariants())) return;
+  }
+  const prompt = variantPrompt(base, old);
+  ctl = new AbortController(); busy(true, old.length ? "Claude is writing a new variant… the old one is replaced once it is ready." : "Claude is writing a variant…");
   try {
     const d = valid(await sample.json(prompt, { signal: ctl.signal, modelTier: "default", cache: false }));
     if (!d) throw { code: "invalid_json" };
-    const keep = [...S.variants, d].slice(-MAXV);
-    S.variants = keep; S.vi = keep.length - 1; S.answer = false; render();
-    // keep them with the question so they can be opened again later
+    const keep = [d];
+    S.variants = keep; S.vi = 0; S.answer = false; render();
+    // keep it with the question so it can be opened again later
     if (base.id && db && canWrite) {
       try { await db.doc("bank/" + base.id).update({ variants: keep }); }
       catch (e) { toast("The variant is on screen but couldn't be saved with the question."); }
